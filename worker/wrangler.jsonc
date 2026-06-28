@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pantau-api",
+  "main": "src/index.mjs",
+  "compatibility_date": "2026-06-24",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "PANTAU_DB",
+      "database_name": "pantau-db",
+      "database_id": "424c9e3b-0c2c-4bd6-a3f9-b9a78d492c4a"
+    }
+  ]
+}

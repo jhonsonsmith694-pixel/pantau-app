@@ -1,0 +1,17 @@
+{
+  "main_module": "index.mjs",
+  "compatibility_date": "2026-06-24",
+  "compatibility_flags": ["nodejs_compat"],
+  "bindings": [
+    {
+      "name": "PANTAU_DB",
+      "type": "d1",
+      "id": "424c9e3b-0c2c-4bd6-a3f9-b9a78d492c4a"
+    },
+    {
+      "name": "PANTAU_KV",
+      "type": "kv_namespace",
+      "namespace_id": "adde843a1c54467fa531df1aef09233e"
+    }
+  ]
+}

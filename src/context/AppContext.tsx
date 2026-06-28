@@ -1,0 +1,222 @@
+// PANTAU App Context — clean architecture via Repository Layer
+// Screen → Hook → Context → Repository → API/Storage → Worker → D1
+import React, { createContext, useState, useCallback, useEffect, useMemo, ReactNode } from 'react';
+import { useColorScheme } from 'react-native';
+import { Monitor, Note, ThemeMode, SyncStatus, MonitorCategory, NoteCategory } from '../types';
+import { logger } from '../services/logger';
+import { syncEngine } from '../services/syncEngine';
+import { migrateStorage } from '../storage';
+import { analytics } from '../services/analytics';
+import { userRepo, monitorRepo, noteRepo, settingsRepo, syncRepo } from '../repository';
+
+export type AppContextType = {
+  user: { name: string; avatar: string } | null;
+  setUser: (u: { name: string; avatar: string }) => void;
+  logout: () => Promise<void>;
+  monitors: Monitor[];
+  addMonitor: (title: string, category: MonitorCategory) => void;
+  editMonitor: (id: number, updates: Partial<Monitor>) => void;
+  toggleMonitor: (id: number) => void;
+  deleteMonitor: (id: number) => void;
+  notes: Note[];
+  addNote: (title: string, content: string, category?: string, color?: string) => void;
+  editNote: (id: number, title: string, content: string, category?: string, color?: string) => void;
+  deleteNote: (id: number) => void;
+  togglePin: (id: number) => void;
+  themeMode: ThemeMode;
+  setThemeMode: (m: ThemeMode) => void;
+  colorScheme: 'light' | 'dark';
+  notificationEnabled: boolean;
+  setNotificationEnabled: (v: boolean) => void;
+  syncing: SyncStatus;
+  syncNow: () => Promise<void>;
+  lastSyncAt: string | null;
+  loaded: boolean;
+};
+
+export const AppContext = createContext<AppContextType | null>(null);
+
+function now() {
+  const d = new Date();
+  return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+}
+
+// Welcome data
+import { WELCOME_MONITORS, WELCOME_NOTES } from '../config/welcome';
+
+// Resolve user ID from user data
+function getUserId(user: { name: string; avatar: string } | null): string {
+  return user?.name?.toLowerCase().replace(/[^a-z0-9]/g, '') || '';
+}
+
+export function AppProvider({ children }: { children: ReactNode }) {
+  const systemColorScheme = useColorScheme();
+  const [loaded, setLoaded] = useState(false);
+  const [user, setUserState] = useState<{ name: string; avatar: string } | null>(null);
+  const [monitors, setMonitors] = useState<Monitor[]>([]);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [themeMode, setThemeModeState] = useState<ThemeMode>('system');
+  const [notificationEnabled, setNotificationState] = useState(false);
+  const [syncing, setSyncing] = useState<SyncStatus>('idle');
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+
+  // Init: migrate storage then load
+  useEffect(() => {
+    (async () => {
+      try {
+        await migrateStorage();
+        const [u, m, n, s, ls] = await Promise.all([
+          userRepo.load(),
+          monitorRepo.load(),
+          noteRepo.load(),
+          settingsRepo.load(),
+          settingsRepo.loadLastSync(),
+        ]);
+        if (u) setUserState(u);
+        if (m.length) setMonitors(m);
+        if (n.length) setNotes(n);
+        setNotificationState(s.notificationEnabled);
+        setThemeModeState(s.theme);
+        if (ls) setLastSyncAt(ls);
+      } catch (e: any) {
+        logger.error('Failed to load data', { error: e.message }, 'context');
+      }
+      setLoaded(true);
+    })();
+  }, []);
+
+  // Persist via repository
+  useEffect(() => { if (loaded) monitorRepo.save(monitors); }, [monitors, loaded]);
+  useEffect(() => { if (loaded) noteRepo.save(notes); }, [notes, loaded]);
+  useEffect(() => { if (loaded) userRepo.save(user); }, [user, loaded]);
+  useEffect(() => {
+    if (loaded) settingsRepo.save({ notificationEnabled, theme: themeMode });
+  }, [notificationEnabled, themeMode, loaded]);
+  useEffect(() => { if (loaded) settingsRepo.saveTheme(themeMode); }, [themeMode, loaded]);
+
+  // Welcome data for new users
+  useEffect(() => {
+    if (loaded && user && monitors.length === 0 && notes.length === 0) {
+      setMonitors(WELCOME_MONITORS);
+      setNotes(WELCOME_NOTES);
+    }
+  }, [loaded, user]);
+
+  const colorScheme = useMemo((): 'light' | 'dark' =>
+    systemColorScheme === 'dark' ? 'dark' : 'light', [systemColorScheme]);
+
+  // Listen to sync engine state
+  useEffect(() => {
+    const unsub = syncEngine.onStateChange((state, item) => {
+      switch (state) {
+        case 'syncing': setSyncing('syncing'); break;
+        case 'success': setSyncing('success'); break;
+        case 'error': setSyncing('error'); break;
+        default: setSyncing('idle');
+      }
+    });
+    return unsub;
+  }, []);
+
+  const setUser = useCallback((u: { name: string; avatar: string }) => {
+    setUserState(u);
+    const uid = getUserId(u);
+    // Async registration + sync
+    setTimeout(() => {
+      userRepo.register(uid, u.name, u.avatar);
+      syncEngine.fullSync(uid, { user: u, monitors: WELCOME_MONITORS, notes: WELCOME_NOTES });
+    }, 1000);
+    analytics.appOpen(uid);
+  }, []);
+
+  const logout = useCallback(async () => {
+    setUserState(null);
+    setMonitors([]);
+    setNotes([]);
+    setNotificationState(false);
+    setLastSyncAt(null);
+    syncEngine.clear();
+    await userRepo.clearAll();
+  }, []);
+
+  const syncNow = useCallback(async () => {
+    const uid = getUserId(user);
+    if (!uid) return;
+    const success = await syncEngine.fullSync(uid, { user, monitors, notes });
+    if (success) {
+      const ts = new Date().toISOString();
+      setLastSyncAt(ts);
+      settingsRepo.saveLastSync(ts);
+    }
+  }, [user, monitors, notes]);
+
+  const addMonitor = useCallback((title: string, category: MonitorCategory) => {
+    setMonitors(prev => {
+      const newMonitor: Monitor = { id: Date.now(), title, category, active: true, createdAt: now() };
+      analytics.monitorCreated(getUserId(user));
+      const uid = getUserId(user);
+      syncEngine.enqueue({ type: 'monitor', action: 'create', data: { title, category }, priority: 'normal', maxRetries: 3 });
+      return [newMonitor, ...prev];
+    });
+  }, [user]);
+
+  const editMonitor = useCallback((id: number, updates: Partial<Monitor>) => {
+    setMonitors(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+    const uid = getUserId(user);
+    syncEngine.enqueue({ type: 'monitor', action: 'update', data: { id, ...updates }, priority: 'normal', maxRetries: 3 });
+  }, [user]);
+
+  const toggleMonitor = useCallback((id: number) => {
+    setMonitors(prev => prev.map(m => m.id === id ? { ...m, active: !m.active } : m));
+  }, []);
+
+  const deleteMonitor = useCallback((id: number) => {
+    setMonitors(prev => prev.filter(m => m.id !== id));
+    analytics.monitorDeleted(getUserId(user));
+    syncEngine.enqueue({ type: 'monitor', action: 'delete', data: { id }, priority: 'high', maxRetries: 3 });
+  }, [user]);
+
+  const addNote = useCallback((title: string, content: string, category: string = 'Umum', color = '#FFFFFF') => {
+    const note: Note = { id: Date.now(), title, content, pinned: false, category: category as NoteCategory, color, createdAt: now() };
+    setNotes(prev => [note, ...prev]);
+    analytics.noteCreated(getUserId(user));
+    syncEngine.enqueue({ type: 'note', action: 'create', data: { title, content, category, color }, priority: 'normal', maxRetries: 3 });
+  }, [user]);
+
+  const editNote = useCallback((id: number, title: string, content: string, category?: string, color?: string) => {
+    setNotes(prev => prev.map(n => n.id === id ? { ...n, title, content, category: (category || n.category) as NoteCategory, color: color || n.color } : n));
+    syncEngine.enqueue({ type: 'note', action: 'update', data: { id, title, content, category, color }, priority: 'normal', maxRetries: 3 });
+  }, []);
+
+  const deleteNote = useCallback((id: number) => {
+    setNotes(prev => prev.filter(n => n.id !== id));
+    analytics.noteDeleted(getUserId(user));
+    syncEngine.enqueue({ type: 'note', action: 'delete', data: { id }, priority: 'high', maxRetries: 3 });
+  }, [user]);
+
+  const togglePin = useCallback((id: number) => {
+    setNotes(prev => prev.map(n => n.id === id ? { ...n, pinned: !n.pinned } : n));
+  }, []);
+
+  const setThemeMode = useCallback((m: ThemeMode) => setThemeModeState(m), []);
+  const setNotificationEnabled = useCallback((v: boolean) => setNotificationState(v), []);
+
+  const value = useMemo(() => ({
+    user, setUser, logout,
+    monitors, addMonitor, editMonitor, toggleMonitor, deleteMonitor,
+    notes, addNote, editNote, deleteNote, togglePin,
+    themeMode, setThemeMode, colorScheme,
+    notificationEnabled, setNotificationEnabled,
+    syncing, syncNow, lastSyncAt,
+    loaded,
+  }), [
+    user, setUser, logout,
+    monitors, addMonitor, editMonitor, toggleMonitor, deleteMonitor,
+    notes, addNote, editNote, deleteNote, togglePin,
+    themeMode, setThemeMode, colorScheme,
+    notificationEnabled, setNotificationEnabled,
+    syncing, syncNow, lastSyncAt, loaded,
+  ]);
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+}
