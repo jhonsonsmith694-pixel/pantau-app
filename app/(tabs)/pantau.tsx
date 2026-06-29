@@ -6,9 +6,10 @@ import { useApp } from "../../src/hooks/useApp";
 import { useTheme } from "../../src/hooks";
 import { Card, EmptyState, Badge } from "../../src/components";
 import { MONITOR_CATEGORIES, PREDEFINED_MONITORS } from "../../src/types";
-import { SPACING, BORDER_RADIUS } from "../../src/config";
+import { SPACING, BORDER_RADIUS, FONTS, TABULAR } from "../../src/config";
 import { getLiveValue, isSupported, LiveQuote } from "../../src/services/liveData";
-import { api } from "../../src/api/client";
+import { useRouter } from "expo-router";
+import { FadeInView, PressableScale } from "../../src/components/motion";
 
 type QuoteState =
   | { status: "loading" }
@@ -30,22 +31,12 @@ export default function PantauScreen() {
   const [editCat, setEditCat] = useState("harga");
   const [quotes, setQuotes] = useState<Record<number, QuoteState>>({});
   const [refreshing, setRefreshing] = useState(false);
-  const [aiInsight, setAiInsight] = useState<string | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
+  const router = useRouter();
 
-  const askAI = useCallback(async () => {
-    setAiLoading(true); setAiError(null);
-    const items = monitors.map(m => {
-      const st = quotes[m.id];
-      if (st && st.status === "ok") return { title: m.title, value: st.quote.display, change: st.quote.change24h };
-      return { title: m.title };
-    });
-    const res = await api.aiInsight({ items });
-    if (res.success) setAiInsight(res.data.insight || "Tidak ada insight.");
-    else setAiError(res.error || "Gagal memuat AI");
-    setAiLoading(false);
-  }, [monitors, quotes]);
+  const liveCount = useMemo(
+    () => monitors.filter(m => isSupported(m.title, m.category)).length,
+    [monitors]
+  );
 
   const loadQuotes = useCallback(async () => {
     const supported = monitors.filter(m => isSupported(m.title, m.category));
@@ -82,21 +73,21 @@ export default function PantauScreen() {
       return <ActivityIndicator size="small" color={colors.textTertiary} style={{ alignSelf: "flex-start", marginTop: 4 }} />;
     }
     if (st.status === "manual") {
-      return <Text style={[styles.itemMeta, { color: colors.textTertiary }]}>Pantauan manual · {m.createdAt}</Text>;
+      return <Text style={[styles.itemMeta, { color: colors.textTertiary }]}>Pantauan manual · belum ada data harga live</Text>;
     }
     if (st.status === "error") {
-      return <Text style={[styles.itemMeta, { color: colors.warning }]}>Gagal memuat data — tarik untuk coba lagi</Text>;
+      return <Text style={[styles.itemMeta, { color: colors.warning }]}>Gagal memuat — tarik ke bawah untuk coba lagi</Text>;
     }
     const q = st.quote;
     const hasChange = q.change24h !== null;
     const up = (q.change24h ?? 0) >= 0;
     return (
       <View style={{ flexDirection: "row", alignItems: "center", marginTop: 3, flexWrap: "wrap" }}>
-        <Text style={[styles.itemValue, { color: colors.text }]}>{q.display}</Text>
+        <Text style={[styles.itemValue, { color: colors.text }, TABULAR]}>{q.display}</Text>
         {hasChange && (
           <View style={{ flexDirection: "row", alignItems: "center", marginLeft: 8 }}>
-            <Ionicons name={up ? "trending-up" : "trending-down"} size={13} color={up ? colors.success : colors.error} />
-            <Text style={{ fontSize: 12, fontWeight: "600", color: up ? colors.success : colors.error, marginLeft: 2 }}>
+            <Ionicons name={up ? "trending-up" : "trending-down"} size={13} color={up ? colors.priceUp : colors.priceDown} />
+            <Text style={[{ fontSize: 12, fontWeight: "600", color: up ? colors.priceUp : colors.priceDown, marginLeft: 2 }, TABULAR]}>
               {up ? "+" : ""}{(q.change24h as number).toFixed(2)}%
             </Text>
           </View>
@@ -119,7 +110,7 @@ export default function PantauScreen() {
     const t = newTitle.trim();
     if (!t) return;
     const exists = monitors.some(m => m.title.toLowerCase() === t.toLowerCase());
-    if (exists) { Alert.alert("Sudah Ada", `"${t}" sudah di daftar pantauan`); return; }
+    if (exists) { Alert.alert("Sudah ada", `"${t}" sudah ada di daftar pantauan`); return; }
     addMonitor(t, newCat as any);
     setNewTitle("");
   }, [newTitle, newCat, monitors, addMonitor]);
@@ -165,7 +156,9 @@ export default function PantauScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>Pantau</Text>
-        <Text style={[styles.headerSub, { color: colors.textTertiary }]}>{monitors.filter(m => m.active).length} aktif</Text>
+        <Text style={[styles.headerSub, { color: colors.textSecondary }]}>
+          Harga real-time crypto, emas & kurs. Item lain tersimpan sebagai pantauan manual.
+        </Text>
       </View>
 
       {/* Search */}
@@ -190,26 +183,22 @@ export default function PantauScreen() {
         ))}
       </ScrollView>
 
-      {/* AI Insight */}
+      {/* AI entry point — full assistant lives in its own tab */}
       {monitors.length > 0 && (
-        <View style={[styles.aiCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Ionicons name="sparkles" size={16} color={colors.primary} />
-              <Text style={[styles.aiTitle, { color: colors.text }]}>AI Insight</Text>
+        <PressableScale onPress={() => router.push("/ai")} accessibilityLabel="Buka asisten AI">
+          <View style={[styles.aiCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.aiIcon, { backgroundColor: colors.accentSoft }]}>
+              <Ionicons name="sparkles" size={18} color={colors.primary} />
             </View>
-            <TouchableOpacity onPress={askAI} disabled={aiLoading} style={[styles.aiBtn, { backgroundColor: aiLoading ? colors.border : colors.primary }]}>
-              {aiLoading ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={{ color: "#FFF", fontSize: 12, fontWeight: "600" }}>Analisa</Text>}
-            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.aiTitle, { color: colors.text }]}>Tanya asisten AI</Text>
+              <Text style={[styles.aiBody, { color: colors.textSecondary }]} numberOfLines={1}>
+                Ringkasan & insight dari pantauan kamu, pakai data real.
+              </Text>
+            </View>
+            <Ionicons name="arrow-forward" size={18} color={colors.textTertiary} />
           </View>
-          {aiError ? (
-            <Text style={[styles.aiBody, { color: colors.warning }]}>{aiError}</Text>
-          ) : aiInsight ? (
-            <Text style={[styles.aiBody, { color: colors.textSecondary }]}>{aiInsight}</Text>
-          ) : (
-            !aiLoading && <Text style={[styles.aiBody, { color: colors.textTertiary }]}>Tekan "Analisa" untuk ringkasan & insight dari pantauanmu.</Text>
-          )}
-        </View>
+        </PressableScale>
       )}
 
       {/* Edit Modal */}
@@ -239,7 +228,7 @@ export default function PantauScreen() {
 
       {filteredMonitors.length === 0 ? (
         <ScrollView keyboardShouldPersistTaps="handled" onScrollBeginDrag={Keyboard.dismiss}>
-          <EmptyState icon="eye-off" title="Belum Ada" description={search ? "Tidak ada hasil" : "Tambahkan pantauan baru"} colors={colors} />
+          <EmptyState icon="eye-off" title={search ? "Tidak ada hasil" : "Belum ada pantauan"} description={search ? "Coba kata kunci lain" : "Tambahkan sesuatu untuk dipantau di bawah"} colors={colors} />
         </ScrollView>
       ) : (
         <FlatList
@@ -291,10 +280,11 @@ const styles = StyleSheet.create({
   itemMeta: { fontSize: 12, marginTop: 1 },
   itemValue: { fontSize: 15, fontWeight: "700", letterSpacing: -0.3 },
   itemSource: { fontSize: 10, marginLeft: 8, marginTop: 1 },
-  aiCard: { marginHorizontal: SPACING.lg, marginBottom: SPACING.sm, padding: SPACING.md, borderRadius: BORDER_RADIUS.lg, borderWidth: 1 },
-  aiTitle: { fontSize: 14, fontWeight: "700", marginLeft: 6 },
+  aiCard: { flexDirection: "row", alignItems: "center", gap: SPACING.md, marginHorizontal: SPACING.lg, marginBottom: SPACING.sm, padding: SPACING.md, borderRadius: BORDER_RADIUS.lg, borderWidth: 1 },
+  aiIcon: { width: 38, height: 38, borderRadius: BORDER_RADIUS.md, alignItems: "center", justifyContent: "center" },
+  aiTitle: { fontSize: 14, fontWeight: "700" },
   aiBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: BORDER_RADIUS.full, minWidth: 70, alignItems: "center" },
-  aiBody: { fontSize: 13, lineHeight: 19, marginTop: SPACING.sm },
+  aiBody: { fontSize: 13, lineHeight: 18, marginTop: 2 },
   bottomBar: { position: "absolute", bottom: 0, left: 0, right: 0, padding: SPACING.lg, paddingBottom: SPACING.xxxl, borderTopWidth: 1 },
   bottomInput: { borderWidth: 1, borderRadius: BORDER_RADIUS.md, paddingHorizontal: 12, height: 40, fontSize: 14 },
   catChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: BORDER_RADIUS.full, borderWidth: 1, marginRight: 6 },

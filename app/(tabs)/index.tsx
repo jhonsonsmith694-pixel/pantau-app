@@ -7,6 +7,7 @@ import { useRouter } from "expo-router";
 import { useApp } from "../../src/hooks/useApp";
 import { useTheme, useRefresh } from "../../src/hooks";
 import { Card, EmptyState, Skeleton } from "../../src/components";
+import { FadeInView, PressableScale } from "../../src/components/motion";
 import { COLORS, SPACING, BORDER_RADIUS } from "../../src/config";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
@@ -36,11 +37,11 @@ export default function BerandaScreen() {
   if (monitors.length === 0 && notes.length === 0) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
-        <LinearGradient colors={isDark ? ["#1E3A5F", "#1E293B"] : ["#0066FF", "#0044CC"]} style={styles.gradientHeader}>
+        <LinearGradient colors={(colors.gradient as [string, string])} style={styles.gradientHeader}>
           <View style={styles.headerContent}>
-            <View>
-              <Text style={styles.greeting}>Halo, {user?.name || "Pengguna"} 👋</Text>
-              <Text style={styles.subtitle}>Belum ada pantauan</Text>
+            <View style={{ flex: 1, paddingRight: SPACING.md }}>
+              <Text style={styles.greeting}>Halo, {user?.name || "Pengguna"}</Text>
+              <Text style={styles.subtitle}>Pantau harga & info penting, lalu tanya AI soal datanya</Text>
             </View>
             <TouchableOpacity onPress={() => router.push("/pantau")} style={[styles.addBtn, { backgroundColor: "rgba(255,255,255,0.2)" }]}>
               <Ionicons name="add" size={24} color="#FFF" />
@@ -55,8 +56,8 @@ export default function BerandaScreen() {
         >
           <EmptyState
             icon="eye"
-            title="Mulai Pantau"
-            description="Tambahkan monitor harga, berita, stok, atau jadwal favorit kamu"
+            title="Mulai pantau"
+            description="Tambahkan harga crypto, emas, atau kurs untuk dipantau real-time"
             action={{ label: "Tambahkan", onPress: () => router.push("/pantau") }}
             colors={colors}
           />
@@ -67,11 +68,11 @@ export default function BerandaScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
-      <LinearGradient colors={isDark ? ["#1E3A5F", "#1E293B"] : ["#0066FF", "#0044CC"]} style={styles.gradientHeader}>
+      <LinearGradient colors={(colors.gradient as [string, string])} style={styles.gradientHeader}>
         <View style={styles.headerContent}>
-          <View>
-            <Text style={styles.greeting}>Halo, {user?.name || "Pengguna"} 👋</Text>
-            <Text style={styles.subtitle}>Ada {stats.active} pantauan aktif</Text>
+          <View style={{ flex: 1, paddingRight: SPACING.md }}>
+            <Text style={styles.greeting}>Halo, {user?.name || "Pengguna"}</Text>
+            <Text style={styles.subtitle}>{stats.active} pantauan aktif · tanya AI soal datanya</Text>
           </View>
           <TouchableOpacity onPress={() => router.push("/pantau")} style={[styles.addBtn, { backgroundColor: "rgba(255,255,255,0.2)" }]}>
             <Ionicons name="add" size={24} color="#FFF" />
@@ -104,6 +105,24 @@ export default function BerandaScreen() {
           ))}
         </View>
 
+        {/* AI entry point */}
+        <FadeInView index={1}>
+          <PressableScale onPress={() => router.push("/ai")} accessibilityLabel="Buka asisten AI">
+            <View style={[styles.aiBanner, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={[styles.aiBannerIcon, { backgroundColor: colors.accentSoft }]}>
+                <Ionicons name="sparkles" size={20} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.aiBannerTitle, { color: colors.text }]}>Asisten AI</Text>
+                <Text style={[styles.aiBannerDesc, { color: colors.textSecondary }]} numberOfLines={2}>
+                  Tanya apa saja soal pantauan kamu — dijawab pakai data harga real.
+                </Text>
+              </View>
+              <Ionicons name="arrow-forward" size={18} color={colors.textTertiary} />
+            </View>
+          </PressableScale>
+        </FadeInView>
+
         {/* Recent Monitors */}
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Pantauan Terbaru</Text>
@@ -115,8 +134,8 @@ export default function BerandaScreen() {
         {recentMonitors.map(m => (
           <TouchableOpacity key={m.id} onPress={() => router.push("/pantau")} activeOpacity={0.7}>
             <Card colors={colors} style={styles.monitorCard}>
-              <View style={[styles.mIcon, { backgroundColor: `${COLORS.light.primary}15` }]}>
-                <Ionicons name={categoryIcon(m.category)} size={20} color={COLORS.light.primary} />
+              <View style={[styles.mIcon, { backgroundColor: colors.accentSoft }]}>
+                <Ionicons name={categoryIcon(m.category)} size={20} color={colors.primary} />
               </View>
               <View style={{ flex: 1, marginLeft: SPACING.md }}>
                 <Text style={[styles.mTitle, { color: colors.text }]}>{m.title}</Text>
@@ -160,12 +179,16 @@ const styles = StyleSheet.create({
   greeting: { fontSize: 22, fontWeight: "700", color: "#FFFFFF" },
   subtitle: { fontSize: 14, color: "rgba(255,255,255,0.8)", marginTop: 4 },
   addBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
-  statsRow: { flexDirection: "row", gap: 8, marginTop: -16, marginBottom: SPACING.xl },
+  statsRow: { flexDirection: "row", gap: 8, marginTop: -16, marginBottom: SPACING.lg },
   statCard: { flex: 1, borderRadius: BORDER_RADIUS.lg, padding: SPACING.md, alignItems: "center", borderWidth: 1, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
   statIcon: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", marginBottom: 6 },
   statValue: { fontSize: 18, fontWeight: "800" },
   statLabel: { fontSize: 11, marginTop: 2 },
   sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: SPACING.md, marginTop: SPACING.sm },
+  aiBanner: { flexDirection: "row", alignItems: "center", gap: SPACING.md, padding: SPACING.lg, borderRadius: BORDER_RADIUS.xl, borderWidth: 1, marginBottom: SPACING.xl },
+  aiBannerIcon: { width: 44, height: 44, borderRadius: BORDER_RADIUS.lg, alignItems: "center", justifyContent: "center" },
+  aiBannerTitle: { fontSize: 15, fontWeight: "700" },
+  aiBannerDesc: { fontSize: 13, lineHeight: 18, marginTop: 2 },
   sectionTitle: { fontSize: 16, fontWeight: "700" },
   sectionLink: { fontSize: 13, fontWeight: "600" },
   monitorCard: { flexDirection: "row", alignItems: "center", paddingVertical: SPACING.md },

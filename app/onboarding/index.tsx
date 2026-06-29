@@ -37,12 +37,12 @@ export default function OnboardingScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }} keyboardVerticalOffset={Platform.OS === "android" ? 0 : 0}>
-        <LinearGradient colors={isDark ? ["#1E3A5F", "#1E293B"] : ["#0066FF", "#0044CC"]} style={styles.header}>
+        <LinearGradient colors={(colors.gradient as [string, string])} style={styles.header}>
           <View style={styles.logoCircle}>
             <Ionicons name="eye" size={36} color="#FFFFFF" />
           </View>
           <Text style={styles.title}>PANTAU</Text>
-          <Text style={styles.subtitle}>AI Personal Monitor</Text>
+          <Text style={styles.subtitle}>Monitor pribadi dengan asisten AI</Text>
         </LinearGradient>
 
         <View style={[styles.form, { backgroundColor: colors.surface }]}>

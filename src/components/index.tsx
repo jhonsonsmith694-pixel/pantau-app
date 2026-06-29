@@ -168,11 +168,11 @@ export const ErrorState = React.memo(function ErrorState({ message = 'Terjadi ke
       <View style={[styles.emptyIcon, { backgroundColor: '#FEE2E2' }]}>
         <Ionicons name="alert-circle" size={36} color={colors.error} />
       </View>
-      <Text style={[styles.emptyTitle, { color: colors.text }]}>Oops!</Text>
+      <Text style={[styles.emptyTitle, { color: colors.text }]}>Gagal memuat</Text>
       <Text style={[styles.emptyDesc, { color: colors.textTertiary }]}>{message}</Text>
       {onRetry && (
         <TouchableOpacity onPress={onRetry} style={[styles.emptyBtn, { backgroundColor: colors.primary }]}>
-          <Text style={styles.emptyBtnText}>Coba Lagi</Text>
+          <Text style={styles.emptyBtnText}>Coba lagi</Text>
         </TouchableOpacity>
       )}
     </View>

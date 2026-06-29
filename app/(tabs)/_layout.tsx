@@ -10,6 +10,7 @@ type IconName = React.ComponentProps<typeof Ionicons>["name"];
 const TABS: { name: string; label: string; icon: IconName }[] = [
   { name: "index", label: "Beranda", icon: "home" },
   { name: "pantau", label: "Pantau", icon: "eye" },
+  { name: "ai", label: "AI", icon: "sparkles" },
   { name: "catatan", label: "Catatan", icon: "document-text" },
   { name: "profil", label: "Profil", icon: "person" },
 ];
@@ -28,14 +29,14 @@ export default function TabLayout() {
           backgroundColor: colors.tabBar,
           borderTopColor: colors.tabBarBorder,
           borderTopWidth: 0.5,
-          height: 56 + insets.bottom,
+          height: 58 + insets.bottom,
           paddingBottom: insets.bottom,
           paddingTop: 4,
           elevation: 8,
           shadowColor: "#000",
           shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
+          shadowOpacity: 0.08,
+          shadowRadius: 6,
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textTertiary,
@@ -47,17 +48,30 @@ export default function TabLayout() {
           key={tab.name}
           name={tab.name}
           options={{
-            tabBarIcon: ({ focused, color, size }) => (
-              <View style={styles.tabItem}>
-                <Ionicons name={focused ? tab.icon : (`${tab.icon}-outline` as IconName)} size={22} color={color} />
-                {tab.name === "pantau" && activeCount > 0 && (
-                  <View style={[styles.badge, { backgroundColor: colors.primary }]}>
-                    <Text style={styles.badgeText}>{activeCount > 9 ? "9+" : activeCount}</Text>
+            tabBarIcon: ({ focused, color }) => {
+              // AI is the centerpiece: render it as a raised accent button.
+              if (tab.name === "ai") {
+                return (
+                  <View style={styles.aiTabWrap}>
+                    <View style={[styles.aiTabBtn, { backgroundColor: colors.primary, shadowColor: colors.primary }]}>
+                      <Ionicons name="sparkles" size={22} color="#FFFFFF" />
+                    </View>
+                    <Text style={[styles.tabLabel, { color: focused ? colors.primary : colors.textTertiary }]}>{tab.label}</Text>
                   </View>
-                )}
-                <Text style={[styles.tabLabel, { color: focused ? colors.primary : colors.textTertiary }]}>{tab.label}</Text>
-              </View>
-            ),
+                );
+              }
+              return (
+                <View style={styles.tabItem}>
+                  <Ionicons name={focused ? tab.icon : (`${tab.icon}-outline` as IconName)} size={22} color={color} />
+                  {tab.name === "pantau" && activeCount > 0 && (
+                    <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+                      <Text style={styles.badgeText}>{activeCount > 9 ? "9+" : activeCount}</Text>
+                    </View>
+                  )}
+                  <Text style={[styles.tabLabel, { color: focused ? colors.primary : colors.textTertiary }]}>{tab.label}</Text>
+                </View>
+              );
+            },
           }}
         />
       ))}
@@ -68,6 +82,12 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   tabItem: { alignItems: "center", justifyContent: "center", width: 60 },
   tabLabel: { fontSize: 10, fontWeight: "600", marginTop: 2 },
+  aiTabWrap: { alignItems: "center", justifyContent: "center", width: 60 },
+  aiTabBtn: {
+    width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center",
+    marginTop: -18, marginBottom: 2,
+    shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 8, elevation: 6,
+  },
   badge: { position: "absolute", top: -2, right: 8, minWidth: 16, height: 16, borderRadius: 8, alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
   badgeText: { color: "#FFFFFF", fontSize: 10, fontWeight: "700" },
 });
