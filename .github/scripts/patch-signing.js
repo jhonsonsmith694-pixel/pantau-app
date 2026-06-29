@@ -19,7 +19,19 @@ if (src.includes("PANTAU_UPLOAD_STORE_FILE")) {
   process.exit(0);
 }
 
-// 1) Add a `release` signing config inside the existing `signingConfigs { ... }` block.
+// 1) Point the release build TYPE at signingConfigs.release.
+//    Do this FIRST, while the only `release {` block in the file is the
+//    buildTypes one (signingConfigs currently only defines `debug`).
+const releaseBuildTypeRe = /(release\s*\{[\s\S]*?signingConfig\s+signingConfigs\.)debug/;
+if (releaseBuildTypeRe.test(src)) {
+  src = src.replace(releaseBuildTypeRe, "$1release");
+} else {
+  console.error(
+    "WARNING: release buildType signingConfig not found in expected form; build may sign with debug key."
+  );
+}
+
+// 2) Add a `release` signing config inside the existing `signingConfigs { ... }` block.
 const releaseSigningConfig = `
         release {
             if (project.hasProperty('PANTAU_UPLOAD_STORE_FILE')) {
@@ -27,6 +39,12 @@ const releaseSigningConfig = `
                 storePassword PANTAU_UPLOAD_STORE_PASSWORD
                 keyAlias PANTAU_UPLOAD_KEY_ALIAS
                 keyPassword PANTAU_UPLOAD_KEY_PASSWORD
+            } else {
+                // Fallback so local/debug builds still work without secrets.
+                storeFile file('debug.keystore')
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
             }
         }`;
 
@@ -37,17 +55,6 @@ if (signingConfigsIdx === -1) {
 }
 const insertAt = src.indexOf("{", signingConfigsIdx) + 1;
 src = src.slice(0, insertAt) + releaseSigningConfig + src.slice(insertAt);
-
-// 2) Point the release build type at signingConfigs.release.
-//    Only touch the occurrence that lives inside `release { ... }`.
-const releaseBlockRe = /(release\s*\{[\s\S]*?signingConfig\s+signingConfigs\.)debug/;
-if (releaseBlockRe.test(src)) {
-  src = src.replace(releaseBlockRe, "$1release");
-} else {
-  console.error(
-    "WARNING: release buildType signingConfig not found in expected form; build may sign with debug key."
-  );
-}
 
 fs.writeFileSync(gradlePath, src);
 console.log("Patched android/app/build.gradle for release signing.");
