@@ -10,6 +10,7 @@ import { SPACING, BORDER_RADIUS, FONTS, TABULAR } from "../../src/config";
 import { FadeInView, PressableScale, usePulse } from "../../src/components/motion";
 import { getLiveValue, isSupported } from "../../src/services/liveData";
 import { api } from "../../src/api/client";
+import { security } from "../../src/services/security";
 
 type Msg = { id: string; role: "user" | "ai"; text: string; model?: string; sources?: { title: string; url: string }[]; usedWeb?: boolean };
 
@@ -29,20 +30,17 @@ export default function AiScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const pulse = usePulse(loading);
 
-  // Same derivation the AppContext uses to map a user to a stable id.
-  const userId = user?.name ? user.name.toLowerCase().replace(/[^a-z0-9]/g, "") : undefined;
-
   const scrollToEnd = useCallback(() => {
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
   }, []);
 
-  // Make sure we hold a valid session token before asking the AI.
+  // Make sure we hold a valid session token before asking the AI, using the
+  // persisted device id as identity (matches AppContext).
   const ensureAuth = useCallback(async () => {
     if (api.getToken()) return;
-    if (userId) {
-      await api.register(userId, user?.name || "Pengguna", (user as any)?.avatar || "person").catch(() => {});
-    }
-  }, [userId, user]);
+    const uid = await security.getDeviceId();
+    await api.register(uid, user?.name || "Pengguna", (user as any)?.avatar || "person").catch(() => {});
+  }, [user]);
 
   // Pull real live values for recognised monitors so the AI answers from
   // actual numbers, never invented ones.
@@ -74,12 +72,12 @@ export default function AiScreen() {
       try {
         await ensureAuth();
         const items = await gatherItems();
-        let res = await api.aiAsk({ items, question: text, web: true }, userId);
+        let res = await api.aiAsk({ items, question: text, web: true });
         // One retry if the session expired/missing.
         if (!res.success && /unauth|401|sesi/i.test(res.error || "")) {
           api.setToken(null);
           await ensureAuth();
-          res = await api.aiAsk({ items, question: text, web: true }, userId);
+          res = await api.aiAsk({ items, question: text, web: true });
         }
         const aiMsg: Msg = res.success
           ? { id: `a${Date.now()}`, role: "ai", text: res.data.answer || "Belum ada jawaban.", model: res.data.model, sources: res.data.sources, usedWeb: res.data.usedWeb }

@@ -53,6 +53,12 @@ async function verifyToken(token, secret) {
     if (parts.length !== 3) return null;
     const [headerB64, payloadB64, sigB64] = parts;
 
+    // Pin algorithm to HS256 — reject alg-confusion ('none', RS256, etc.)
+    try {
+      const hdr = JSON.parse(new TextDecoder().decode(base64urlDecode(headerB64)));
+      if (!hdr || hdr.alg !== 'HS256') return null;
+    } catch { return null; }
+
     // Verify signature
     const key = await crypto.subtle.importKey(
       'raw', new TextEncoder().encode(secret),
@@ -217,12 +223,12 @@ export default {
 
       // HEALTH (no auth)
       if (path === '/api/health') return json({
-        status: 'ok', version: '2.3.0', ts: now(), uptime: start,
+        status: 'ok', version: '2.4.0', ts: now(), uptime: start,
       });
 
       // VERSION (no auth)
       if (path === '/api/version') return json({
-        name: 'pantau-api', version: '2.3.0', built_at: '2026-06-27',
+        name: 'pantau-api', version: '2.4.0', built_at: '2026-06-27',
         features: ['auth', 'jwt', 'monitors', 'notes', 'reminders', 'sync', 'analytics', 'ai', 'web-search'],
       });
 
@@ -241,7 +247,15 @@ export default {
           if (userId.length < 2 || userId.length > 50) return error('userId panjang 2-50 karakter', 400);
           if (name.length < 1 || name.length > 100) return error('name panjang 1-100 karakter', 400);
           const existing = await DB.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first();
-          if (existing) return error('User sudah ada', 409);
+          if (existing) {
+            // Idempotent: this device id is already registered, so re-issue a
+            // fresh session token instead of 409. Identity is a device-bound
+            // random id (acts as the bearer secret), so this is a token refresh
+            // — prevents users being locked out of their own cloud data.
+            const token = await signToken({ sub: userId }, JWT_SECRET);
+            await log('user.login', 'user', userId, { userId });
+            return json({ success: true, userId, token, existing: true });
+          }
           await DB.prepare(
             'INSERT INTO users (id, name, email, avatar, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
           ).bind(userId, name, email || null, avatar || 'person', now(), now()).run();
@@ -408,7 +422,7 @@ export default {
           }
           body = sanitizeAll(body);
           const { valid, keys, error: colError } = validateColumns('users', body);
-          if (!valid) return error(`Invalid fields: ${keys ? keys.join(', ') : colError}`, 400);
+          if (!valid) return error(colError || 'Invalid fields', 400);
           const sets = keys.map(k => `${k} = ?`).join(', ');
           if (!sets) return error('No valid fields', 400);
           const vals = keys.map(k => body[k]);

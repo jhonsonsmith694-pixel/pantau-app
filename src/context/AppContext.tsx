@@ -8,6 +8,8 @@ import { syncEngine } from '../services/syncEngine';
 import { migrateStorage } from '../storage';
 import { analytics } from '../services/analytics';
 import { userRepo, monitorRepo, noteRepo, settingsRepo, syncRepo } from '../repository';
+import { api } from '../api/client';
+import { security } from '../services/security';
 
 export type AppContextType = {
   user: { name: string; avatar: string } | null;
@@ -44,9 +46,14 @@ function now() {
 // Welcome data
 import { WELCOME_MONITORS, WELCOME_NOTES } from '../config/welcome';
 
-// Resolve user ID from user data
+// Stable, device-bound account id (random, unguessable, persisted in secure
+// store). Cached here so the many synchronous getUserId() callers stay simple.
+let cachedDeviceId = '';
+
+// Resolve user ID. Prefer the persisted device id; fall back to a name-derived
+// id only before the device id has loaded.
 function getUserId(user: { name: string; avatar: string } | null): string {
-  return user?.name?.toLowerCase().replace(/[^a-z0-9]/g, '') || '';
+  return cachedDeviceId || user?.name?.toLowerCase().replace(/[^a-z0-9]/g, '') || '';
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -65,6 +72,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         await migrateStorage();
+        // Establish a stable device identity + restore any saved session token
+        // BEFORE touching the network, so cloud features survive app restarts.
+        try {
+          cachedDeviceId = await security.getDeviceId();
+          await api.restoreToken();
+        } catch (e: any) {
+          logger.warn('Auth init failed', { error: e?.message }, 'context');
+        }
         const [u, m, n, s, ls] = await Promise.all([
           userRepo.load(),
           monitorRepo.load(),
@@ -78,6 +93,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setNotificationState(s.notificationEnabled);
         setThemeModeState(s.theme);
         if (ls) setLastSyncAt(ls);
+        // Refresh the session token idempotently (worker returns a token for an
+        // existing device id instead of 409). captureToken persists it.
+        if (u && cachedDeviceId) {
+          userRepo.register(cachedDeviceId, u.name, u.avatar);
+        }
       } catch (e: any) {
         logger.error('Failed to load data', { error: e.message }, 'context');
       }
@@ -120,13 +140,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const setUser = useCallback((u: { name: string; avatar: string }) => {
     setUserState(u);
-    const uid = getUserId(u);
-    // Async registration + sync
-    setTimeout(() => {
-      userRepo.register(uid, u.name, u.avatar);
+    // Register against the stable device id (idempotent on the worker) and
+    // run the first full sync. Done async so onboarding stays snappy.
+    setTimeout(async () => {
+      const uid = await security.getDeviceId();
+      cachedDeviceId = uid;
+      await userRepo.register(uid, u.name, u.avatar);
       syncEngine.fullSync(uid, { user: u, monitors: WELCOME_MONITORS, notes: WELCOME_NOTES });
-    }, 1000);
-    analytics.appOpen(uid);
+      analytics.appOpen(uid);
+    }, 800);
   }, []);
 
   const logout = useCallback(async () => {
@@ -136,6 +158,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setNotificationState(false);
     setLastSyncAt(null);
     syncEngine.clear();
+    api.setToken(null);            // drop + clear persisted session token
+    await security.clearToken();
     await userRepo.clearAll();
   }, []);
 

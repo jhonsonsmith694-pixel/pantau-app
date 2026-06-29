@@ -31,6 +31,8 @@ function deobfuscate(encoded: string): string {
 const PREFIX = `${CONFIG.storagePrefix}secure_`;
 
 class SecurityService {
+  private cachedDeviceId: string | null = null;
+
   async set(key: string, value: string): Promise<void> {
     if (SecureStore?.setItemAsync) {
       try { await SecureStore.setItemAsync(PREFIX + key, value); return; } catch {}
@@ -59,6 +61,34 @@ class SecurityService {
       await AsyncStorage.removeItem(PREFIX + key);
     } catch {}
   }
+
+  // ===== Device identity =====
+  // A random, unguessable id created once per install and kept in secure
+  // storage. Used as the account id so identity is not derived from the
+  // (guessable) display name, and survives restarts so the user is never
+  // locked out of their cloud data.
+  private randomId(len: number): string {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let s = '';
+    for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * chars.length)];
+    return s;
+  }
+
+  async getDeviceId(): Promise<string> {
+    if (this.cachedDeviceId) return this.cachedDeviceId;
+    let id = await this.get('device_id');
+    if (!id || !/^dev_[a-z0-9]{20,}$/.test(id)) {
+      id = `dev_${Date.now().toString(36)}${this.randomId(24)}`;
+      await this.set('device_id', id);
+    }
+    this.cachedDeviceId = id;
+    return id;
+  }
+
+  // ===== Session token (JWT) persistence =====
+  async saveToken(token: string): Promise<void> { return this.set('jwt', token); }
+  async loadToken(): Promise<string | null> { return this.get('jwt'); }
+  async clearToken(): Promise<void> { return this.remove('jwt'); }
 
   sanitize(input: string): string { return sanitize(input); }
 

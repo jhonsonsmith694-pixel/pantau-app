@@ -1,6 +1,7 @@
 // API Client — no hardcoded paths, uses API_PATHS from config
 import { CONFIG, API_PATHS } from '../config';
 import { logger } from '../services/logger';
+import { security } from '../services/security';
 
 // Timeout helper (Hermes-safe)
 function timeoutSignal(ms: number): { signal: AbortSignal; clear: () => void } {
@@ -68,8 +69,17 @@ class APIClient {
 
   private token: string | null = null;
 
-  setToken(t: string | null) { this.token = t; }
+  setToken(t: string | null) {
+    this.token = t;
+    if (t) security.saveToken(t).catch(() => {});
+    else security.clearToken().catch(() => {});
+  }
   getToken(): string | null { return this.token; }
+
+  // Restore a persisted session token (call once on app startup).
+  async restoreToken(): Promise<void> {
+    try { const t = await security.loadToken(); if (t) this.token = t; } catch {}
+  }
 
   private auth(userId?: string): Record<string, string> {
     const t = this.token || userId;
@@ -85,10 +95,11 @@ class APIClient {
     return this.request<{ version: string }>(API_PATHS.version);
   }
 
-  // Clean token from response
+  // Capture token from response and persist it for the next app launch.
   private captureToken(res: ApiResult): ApiResult {
     if (res.success && (res.data as any)?.token) {
       this.token = (res.data as any).token;
+      security.saveToken(this.token as string).catch(() => {});
     }
     return res;
   }
