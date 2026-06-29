@@ -4,11 +4,22 @@ import { useEffect, useState } from "react";
 import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 import { SplashScreen } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import {
+  useFonts,
+  Outfit_400Regular, Outfit_500Medium, Outfit_600SemiBold, Outfit_700Bold, Outfit_800ExtraBold,
+} from "@expo-google-fonts/outfit";
+import { JetBrainsMono_400Regular, JetBrainsMono_500Medium } from "@expo-google-fonts/jetbrains-mono";
 import { AppProvider } from "../src/AppContext";
 import { useApp } from "../src/hooks/useApp";
 import { ErrorBoundary } from "../src/components/ErrorBoundary";
 
 SplashScreen.preventAutoHideAsync();
+
+// Global baseline font so every Text without an explicit family uses Outfit
+// (taste skills ban system defaults). Headers/labels override with their own weight.
+const RNTextAny = Text as any;
+RNTextAny.defaultProps = RNTextAny.defaultProps || {};
+RNTextAny.defaultProps.style = [{ fontFamily: "Outfit_400Regular" }, RNTextAny.defaultProps.style];
 
 export default function RootLayout() {
   return (
@@ -23,15 +34,19 @@ export default function RootLayout() {
 function RootNavigator() {
   const { loaded } = useApp();
   const [splashDone, setSplashDone] = useState(false);
+  const [fontsLoaded] = useFonts({
+    Outfit_400Regular, Outfit_500Medium, Outfit_600SemiBold, Outfit_700Bold, Outfit_800ExtraBold,
+    JetBrainsMono_400Regular, JetBrainsMono_500Medium,
+  });
 
   useEffect(() => {
-    if (loaded) {
+    if (loaded && fontsLoaded) {
       setTimeout(() => {
         SplashScreen.hideAsync();
         setSplashDone(true);
-      }, 300);
+      }, 200);
     }
-  }, [loaded]);
+  }, [loaded, fontsLoaded]);
 
   if (!splashDone) {
     return (
@@ -42,7 +57,7 @@ function RootNavigator() {
             <Ionicons name="eye" size={40} color="#FFFFFF" />
           </View>
           <Text style={styles.splashTitle}>PANTAU</Text>
-          <ActivityIndicator color="#0066FF" style={{ marginTop: 20 }} />
+          <ActivityIndicator color="#0F766E" style={{ marginTop: 20 }} />
         </View>
       </View>
     );
@@ -53,7 +68,7 @@ function RootNavigator() {
       <StatusBar style="dark" />
       <Stack screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: "#F0F2F5" },
+        contentStyle: { backgroundColor: "#F7F7F8" },
         animation: "slide_from_right",
       }}>
         <Stack.Screen name="onboarding" />
@@ -64,8 +79,8 @@ function RootNavigator() {
 }
 
 const styles = StyleSheet.create({
-  splash: { flex: 1, backgroundColor: "#F0F2F5", justifyContent: "center", alignItems: "center" },
+  splash: { flex: 1, backgroundColor: "#F7F7F8", justifyContent: "center", alignItems: "center" },
   splashContent: { alignItems: "center" },
-  splashLogo: { width: 80, height: 80, borderRadius: 40, backgroundColor: "#0066FF", alignItems: "center", justifyContent: "center", marginBottom: 16 },
-  splashTitle: { fontSize: 28, fontWeight: "800", color: "#0F172A", letterSpacing: -0.5 },
+  splashLogo: { width: 80, height: 80, borderRadius: 24, backgroundColor: "#0F766E", alignItems: "center", justifyContent: "center", marginBottom: 16 },
+  splashTitle: { fontSize: 30, fontWeight: "800", color: "#18181B", letterSpacing: -1, fontFamily: "Outfit_800ExtraBold" },
 });

@@ -217,13 +217,13 @@ export default {
 
       // HEALTH (no auth)
       if (path === '/api/health') return json({
-        status: 'ok', version: '2.2.0', ts: now(), uptime: start,
+        status: 'ok', version: '2.3.0', ts: now(), uptime: start,
       });
 
       // VERSION (no auth)
       if (path === '/api/version') return json({
-        name: 'pantau-api', version: '2.2.0', built_at: '2026-06-27',
-        features: ['auth', 'jwt', 'monitors', 'notes', 'reminders', 'sync', 'analytics', 'ai'],
+        name: 'pantau-api', version: '2.3.0', built_at: '2026-06-27',
+        features: ['auth', 'jwt', 'monitors', 'notes', 'reminders', 'sync', 'analytics', 'ai', 'web-search'],
       });
 
       // ============= AUTH =============
@@ -306,6 +306,77 @@ export default {
             return error('Gagal memanggil AI', 502);
           }
         }
+
+        // /api/v2/ai/ask — free-form question answered with live web search
+        // (Firecrawl) + the user's price data, summarised by NVIDIA NIM.
+        if (param1 === 'ask' && method === 'POST') {
+          if (!env.NVIDIA_API_KEY) return error('AI belum dikonfigurasi di server', 503);
+          let body;
+          try { body = await parseBody(request); } catch (e) {
+            return e instanceof BodyTooLargeError ? json({ error: e.message }, 413) : error('Invalid body', 400);
+          }
+          const question = typeof body.question === 'string' ? body.question.slice(0, 500).trim() : '';
+          if (!question) return error('Pertanyaan kosong', 400);
+          const items = Array.isArray(body.items) ? body.items.slice(0, 50) : [];
+          const wantWeb = body.web !== false;
+          const priceLines = items.map((it) => {
+            const t = String(it.title || '').slice(0, 120);
+            const v = it.value != null && it.value !== '' ? String(it.value).slice(0, 60) : 'manual';
+            const c = it.change != null && !isNaN(Number(it.change)) ? ` (${Number(it.change).toFixed(2)}% 24j)` : '';
+            return `- ${t}: ${v}${c}`;
+          }).join('\n');
+
+          // 1) Firecrawl web search for fresh, real-world context.
+          let webContext = '';
+          let sources = [];
+          if (wantWeb && env.FIRECRAWL_API_KEY) {
+            try {
+              const fcRes = await fetch('https://api.firecrawl.dev/v2/search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.FIRECRAWL_API_KEY}` },
+                body: JSON.stringify({ query: question, limit: 4 }),
+              });
+              if (fcRes.ok) {
+                const fc = await fcRes.json();
+                const web = (fc?.data?.web || fc?.data || []).slice(0, 4);
+                sources = web.map((r) => ({ title: String(r.title || '').slice(0, 160), url: r.url }));
+                webContext = web.map((r, i) =>
+                  `[${i + 1}] ${String(r.title || '').slice(0, 160)}\n${String(r.description || r.snippet || '').slice(0, 400)}\n(${r.url})`
+                ).join('\n\n');
+              }
+            } catch (e) { /* web is best-effort; fall through to price-only answer */ }
+          }
+
+          const system = 'Kamu asisten pribadi untuk pengguna Indonesia. Jawab ringkas (maks 5 kalimat), Bahasa Indonesia santai dan akurat. Pakai data harga pengguna dan hasil pencarian web terkini yang diberikan. Jangan mengarang angka — kalau datanya tidak ada, katakan terus terang. Kalau memakai info dari web, sebut sumbernya secara singkat.';
+          const userMsg = [
+            items.length ? `Data pantauan pengguna:\n${priceLines}` : '',
+            webContext ? `Hasil pencarian web terkini:\n${webContext}` : '',
+            `Pertanyaan: ${question}`,
+          ].filter(Boolean).join('\n\n');
+          const model = env.NVIDIA_MODEL || 'meta/llama-3.1-8b-instruct';
+          try {
+            const aiRes = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.NVIDIA_API_KEY}` },
+              body: JSON.stringify({
+                model,
+                messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }],
+                temperature: 0.4, max_tokens: 420, stream: false,
+              }),
+            });
+            if (!aiRes.ok) {
+              await log('ai.error', 'ai', null, { userId: authUser, status: aiRes.status });
+              return error('AI provider error', 502);
+            }
+            const data = await aiRes.json();
+            const answer = (data?.choices?.[0]?.message?.content || '').trim();
+            await log('ai.ask', 'ai', null, { userId: authUser, web: sources.length });
+            return json({ answer, sources, model, usedWeb: sources.length > 0 });
+          } catch (e) {
+            return error('Gagal memanggil AI', 502);
+          }
+        }
+
         return error('Not found', 404);
       }
 

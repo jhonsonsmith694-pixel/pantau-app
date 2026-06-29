@@ -81,7 +81,7 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   tabItem: { alignItems: "center", justifyContent: "center", width: 60 },
-  tabLabel: { fontSize: 10, fontWeight: "600", marginTop: 2 },
+  tabLabel: { fontSize: 10, fontFamily: "Outfit_600SemiBold", marginTop: 2 },
   aiTabWrap: { alignItems: "center", justifyContent: "center", width: 60 },
   aiTabBtn: {
     width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center",

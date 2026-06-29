@@ -27,88 +27,96 @@ export const CONFIG = {
   textScaleMax: 1.3,
 } as const;
 
-// PANTAU palette — warm editorial monochrome + a single considered accent.
-// Deliberately avoids the blue/purple "AI gradient" fingerprint. Accent is a
-// warm amber/clay that ties to the flagship "harga emas" monitor. Price up/down
-// use muted green/brick so data reads clearly against the brand accent.
+// PANTAU palette — neutral Zinc base + a single restrained teal accent.
+// Follows the taste skills (gpt-taste / stitch-design-taste): absolute neutral
+// bases, one accent under 80% saturation, never pure black, no blue/purple AI
+// neon. Price up/down keep functional green/red, distinct from the teal brand.
 export const COLORS = {
   light: {
-    primary: '#B45309',        // warm amber/clay — the single brand accent
-    primaryLight: '#F4E6D6',   // soft accent tint for icon/badge backgrounds
-    accent: '#B45309',
-    accentSoft: '#F4E6D6',
-    background: '#F4F1EA',      // warm bone canvas
+    primary: '#0F766E',        // teal-700 — single brand accent
+    primaryLight: '#CCFBF1',   // teal-100 tint for icon/badge backgrounds
+    accent: '#0F766E',
+    accentSoft: '#CCFBF1',
+    background: '#F7F7F8',      // neutral zinc canvas
     surface: '#FFFFFF',
-    surfaceSecondary: '#FAF7F0',
-    text: '#1C1A16',           // warm near-black ink (never pure #000)
-    textSecondary: '#5B574D',  // warm gray
-    textTertiary: '#8C8678',
-    border: '#E7E1D5',         // warm hairline
-    error: '#B23B2E',
-    success: '#2F7D5B',
-    warning: '#B7791F',
-    info: '#5B574D',
-    priceUp: '#2F7D5B',        // muted green — value gained
-    priceDown: '#B23B2E',      // muted brick — value lost
-    cardShadow: 'rgba(64,48,24,0.06)',  // tinted, not pure black
-    overlay: 'rgba(28,26,22,0.45)',
-    tabBar: 'rgba(255,255,255,0.92)',
-    tabBarBorder: '#E7E1D5',
-    gradient: ['#B45309', '#8A4218'],   // warm tonal, used sparingly
-    highContrast: '#1C1A16',
-    link: '#B45309',
+    surfaceSecondary: '#F1F1F2',
+    text: '#18181B',           // zinc-900 ink (never pure black)
+    textSecondary: '#52525B',  // zinc-600
+    textTertiary: '#A1A1AA',   // zinc-400
+    border: '#E4E4E7',         // zinc-200 hairline
+    error: '#DC2626',
+    success: '#16A34A',
+    warning: '#CA8A04',
+    info: '#52525B',
+    priceUp: '#16A34A',        // leaf green — gained
+    priceDown: '#DC2626',      // red — lost
+    cardShadow: 'rgba(24,24,27,0.06)',
+    overlay: 'rgba(24,24,27,0.45)',
+    tabBar: 'rgba(255,255,255,0.94)',
+    tabBarBorder: '#E4E4E7',
+    gradient: ['#134E4A', '#0F766E'],   // teal tonal — distinctive, not AI-blue
+    highContrast: '#18181B',
+    link: '#0F766E',
   },
   dark: {
-    primary: '#E0934E',        // brighter warm amber for dark surfaces
-    primaryLight: '#2A2018',
-    accent: '#E0934E',
-    accentSoft: '#2A2018',
-    background: '#161410',     // warm charcoal (tinted, not pure black)
-    surface: '#211E18',
-    surfaceSecondary: '#1B1914',
-    text: '#F2EEE5',           // warm off-white
-    textSecondary: '#A89F8D',
-    textTertiary: '#736C5C',
-    border: '#322E26',
-    error: '#D2685B',
-    success: '#4FA37A',
+    primary: '#2DD4BF',        // teal-400 brighter for dark surfaces
+    primaryLight: '#134E4A',
+    accent: '#2DD4BF',
+    accentSoft: '#134E4A',
+    background: '#0A0A0B',      // zinc-950 off-black (not pure)
+    surface: '#18181B',
+    surfaceSecondary: '#131316',
+    text: '#FAFAFA',
+    textSecondary: '#A1A1AA',
+    textTertiary: '#71717A',
+    border: '#27272A',
+    error: '#F87171',
+    success: '#34D399',
     warning: '#D6A23E',
-    info: '#A89F8D',
-    priceUp: '#4FA37A',
-    priceDown: '#D2685B',
+    info: '#A1A1AA',
+    priceUp: '#34D399',
+    priceDown: '#F87171',
     cardShadow: 'rgba(0,0,0,0.4)',
     overlay: 'rgba(0,0,0,0.65)',
-    tabBar: 'rgba(33,30,24,0.92)',
-    tabBarBorder: '#322E26',
-    gradient: ['#2A2620', '#161410'],
+    tabBar: 'rgba(24,24,27,0.94)',
+    tabBarBorder: '#27272A',
+    gradient: ['#134E4A', '#0A0A0B'],
     highContrast: '#FFFFFF',
-    link: '#E0934E',
+    link: '#2DD4BF',
   },
 };
 
-// Monospace family for prices/figures so digits line up (tabular feel even
-// where fontVariant is unsupported). Hermes/RN-safe system fonts.
-export const MONO_FONT = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }) as string;
+// Premium type system (taste skills ban Inter/system fonts). Outfit for UI/
+// display, JetBrains Mono for numbers/metadata. Loaded in app/_layout.tsx.
+export const FONT_FAMILY = {
+  regular: 'Outfit_400Regular',
+  medium: 'Outfit_500Medium',
+  semibold: 'Outfit_600SemiBold',
+  bold: 'Outfit_700Bold',
+  extrabold: 'Outfit_800ExtraBold',
+  mono: 'JetBrainsMono_400Regular',
+  monoMedium: 'JetBrainsMono_500Medium',
+};
 
-// Apply to any <Text> showing numbers in a data-dense context.
-export const TABULAR = { fontVariant: ['tabular-nums' as const] };
+export const MONO_FONT = FONT_FAMILY.monoMedium;
+// Tabular figures for digits; pair with the mono family for data-dense numbers.
+export const TABULAR = { fontFamily: FONT_FAMILY.monoMedium, fontVariant: ['tabular-nums' as const] };
 
 export const FONTS = {
-  regular: { fontSize: 15, lineHeight: 22 },
-  medium: { fontSize: 15, lineHeight: 22, fontWeight: '500' as const },
-  semibold: { fontSize: 16, lineHeight: 24, fontWeight: '600' as const },
-  bold: { fontSize: 18, lineHeight: 26, fontWeight: '700' as const },
-  // Display headers: heavier presence, tighter tracking (redesign skill).
-  display: { fontSize: 34, lineHeight: 38, fontWeight: '800' as const, letterSpacing: -1 },
-  h1: { fontSize: 28, lineHeight: 33, fontWeight: '800' as const, letterSpacing: -0.6 },
-  h2: { fontSize: 22, lineHeight: 28, fontWeight: '700' as const, letterSpacing: -0.3 },
-  h3: { fontSize: 17, lineHeight: 24, fontWeight: '600' as const, letterSpacing: -0.2 },
-  // Eyebrow/label: small caps with positive tracking.
-  eyebrow: { fontSize: 11, lineHeight: 14, fontWeight: '600' as const, letterSpacing: 1.4, textTransform: 'uppercase' as const },
-  caption: { fontSize: 12, lineHeight: 16 },
-  // Numeric: monospace + tabular figures for prices.
-  numeric: { fontFamily: MONO_FONT, fontVariant: ['tabular-nums' as const] },
-  h1Tablet: { fontSize: 40, lineHeight: 46, fontWeight: '800' as const, letterSpacing: -1 },
+  regular: { fontFamily: FONT_FAMILY.regular, fontSize: 15, lineHeight: 22 },
+  medium: { fontFamily: FONT_FAMILY.medium, fontSize: 15, lineHeight: 22 },
+  semibold: { fontFamily: FONT_FAMILY.semibold, fontSize: 16, lineHeight: 24 },
+  bold: { fontFamily: FONT_FAMILY.bold, fontSize: 18, lineHeight: 26 },
+  // Display headers: weight-driven hierarchy, track-tight (not screaming size).
+  display: { fontFamily: FONT_FAMILY.extrabold, fontSize: 32, lineHeight: 37, letterSpacing: -1 },
+  h1: { fontFamily: FONT_FAMILY.bold, fontSize: 26, lineHeight: 31, letterSpacing: -0.6 },
+  h2: { fontFamily: FONT_FAMILY.semibold, fontSize: 21, lineHeight: 27, letterSpacing: -0.3 },
+  h3: { fontFamily: FONT_FAMILY.semibold, fontSize: 17, lineHeight: 23, letterSpacing: -0.2 },
+  // Eyebrow/label: small caps, positive tracking.
+  eyebrow: { fontFamily: FONT_FAMILY.semibold, fontSize: 11, lineHeight: 14, letterSpacing: 1.6, textTransform: 'uppercase' as const },
+  caption: { fontFamily: FONT_FAMILY.regular, fontSize: 12, lineHeight: 16 },
+  numeric: { fontFamily: FONT_FAMILY.monoMedium, fontVariant: ['tabular-nums' as const] },
+  h1Tablet: { fontFamily: FONT_FAMILY.extrabold, fontSize: 38, lineHeight: 44, letterSpacing: -1 },
 };
 
 export const SPACING = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32 };
@@ -117,14 +125,13 @@ export const BORDER_RADIUS = { sm: 8, md: 12, lg: 16, xl: 22, xxl: 28, full: 999
 
 // Motion tokens — spring/timing presets shared by entry + press animations.
 export const MOTION = {
-  // Heavy, premium easing (high-end-visual-design skill).
   easing: [0.32, 0.72, 0, 1] as const,
   pressScale: 0.97,
   durationFast: 180,
   durationBase: 320,
   durationSlow: 520,
-  staggerStep: 70,   // ms delay between cascading list items
-  entryOffset: 16,   // px translateY for fade-up entry
+  staggerStep: 70,
+  entryOffset: 16,
 };
 
 export const API_PATHS = {
@@ -145,6 +152,7 @@ export const API_PATHS = {
   events: '/api/v2/events',
   notifications: '/api/v2/notifications',
   aiInsight: '/api/v2/ai/insight',
+  aiAsk: '/api/v2/ai/ask',
 } as const;
 
 export const ERROR_MESSAGES = {

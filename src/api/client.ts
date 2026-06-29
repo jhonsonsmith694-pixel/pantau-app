@@ -246,6 +246,27 @@ class APIClient {
       timeout: 30000,
     });
   }
+
+  // Free-form question answered with live web search (Firecrawl) + price data,
+  // summarised by NVIDIA NIM. Server-side keys only.
+  async aiAsk(
+    payload: {
+      question: string;
+      items?: { title: string; value?: string | number | null; change?: number | null }[];
+      web?: boolean;
+    },
+    userId?: string
+  ) {
+    return this.request<{ answer: string; sources: { title: string; url: string }[]; model: string; usedWeb: boolean }>(
+      API_PATHS.aiAsk,
+      {
+        method: 'POST',
+        headers: this.auth(userId),
+        body: JSON.stringify(payload),
+        timeout: 45000,
+      }
+    );
+  }
 }
 
 export const api = new APIClient();
