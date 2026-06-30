@@ -187,7 +187,9 @@ export default {
       } catch { return true; }
     }
 
-    if (!(await checkRateLimit(ip()))) return json({ error: 'Too many requests' }, 429);
+    // NOTE: rate limiting is applied only to the expensive AI endpoints below
+    // (they call NVIDIA + Firecrawl). Every KV write counts against the free-tier
+    // daily quota, so we no longer write to KV on every request.
 
     // JWT Auth — verify Bearer token
     async function getUserFromHeader() {
@@ -223,12 +225,12 @@ export default {
 
       // HEALTH (no auth)
       if (path === '/api/health') return json({
-        status: 'ok', version: '2.4.0', ts: now(), uptime: start,
+        status: 'ok', version: '2.5.0', ts: now(), uptime: start,
       });
 
       // VERSION (no auth)
       if (path === '/api/version') return json({
-        name: 'pantau-api', version: '2.4.0', built_at: '2026-06-27',
+        name: 'pantau-api', version: '2.5.0', built_at: '2026-06-27',
         features: ['auth', 'jwt', 'monitors', 'notes', 'reminders', 'sync', 'analytics', 'ai', 'web-search'],
       });
 
@@ -281,6 +283,11 @@ export default {
 
       // ============= AI (NVIDIA NIM proxy — API key stays server-side) =============
       if (resource === 'ai') {
+        // Rate-limit only here (per user) — protects paid AI/web credits and
+        // keeps KV writes low (free-tier friendly).
+        if (!(await checkRateLimit(`ai:${authUser || ip()}`))) {
+          return json({ error: 'Terlalu banyak permintaan AI. Coba lagi sebentar lagi.' }, 429);
+        }
         if (param1 === 'insight' && method === 'POST') {
           if (!env.NVIDIA_API_KEY) return error('AI belum dikonfigurasi di server', 503);
           let body;
