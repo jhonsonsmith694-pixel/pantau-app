@@ -144,6 +144,85 @@ function validateColumns(table, updates) {
   return { valid: true, keys: valid };
 }
 
+// ===== Multi-provider AI with automatic fallback =====
+// Tries providers in order: Groq (fast, 14.4K/day) -> NVIDIA NIM -> Gemini.
+// Each provider is attempted only if its key is configured. Returns the first
+// successful completion. Throws only if ALL providers fail.
+async function callAIWithFallback(env, system, userMsg, maxTokens, temperature) {
+  const messages = [{ role: 'system', content: system }, { role: 'user', content: userMsg }];
+  const errors = [];
+
+  // 1) Groq — fastest, highest free daily quota
+  if (env.GROQ_API_KEY) {
+    try {
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.GROQ_API_KEY}` },
+        body: JSON.stringify({
+          model: env.GROQ_MODEL || 'llama-3.1-8b-instant',
+          messages, temperature, max_tokens: maxTokens, stream: false,
+        }),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        const content = (d?.choices?.[0]?.message?.content || '').trim();
+        if (content) return { content, provider: 'groq', model: env.GROQ_MODEL || 'llama-3.1-8b-instant' };
+      }
+      errors.push(`groq:${r.status}`);
+    } catch (e) { errors.push(`groq:exc`); }
+  }
+
+  // 2) NVIDIA NIM — large free tier
+  if (env.NVIDIA_API_KEY) {
+    try {
+      const r = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.NVIDIA_API_KEY}` },
+        body: JSON.stringify({
+          model: env.NVIDIA_MODEL || 'meta/llama-3.1-8b-instruct',
+          messages, temperature, max_tokens: maxTokens, stream: false,
+        }),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        const content = (d?.choices?.[0]?.message?.content || '').trim();
+        if (content) return { content, provider: 'nvidia', model: env.NVIDIA_MODEL || 'meta/llama-3.1-8b-instruct' };
+      }
+      errors.push(`nvidia:${r.status}`);
+    } catch (e) { errors.push(`nvidia:exc`); }
+  }
+
+  // 3) Gemini — last-resort backup. Supports multiple keys (rotation) via
+  // comma-separated GEMINI_API_KEY. Tries each key until one succeeds.
+  if (env.GEMINI_API_KEY) {
+    const gmodel = env.GEMINI_MODEL || 'gemini-2.0-flash';
+    const keys = String(env.GEMINI_API_KEY).split(',').map(k => k.trim()).filter(Boolean);
+    for (const key of keys) {
+      try {
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${gmodel}:generateContent?key=${key}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: `${system}\n\n${userMsg}` }] }],
+              generationConfig: { temperature, maxOutputTokens: maxTokens },
+            }),
+          }
+        );
+        if (r.ok) {
+          const d = await r.json();
+          const content = (d?.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
+          if (content) return { content, provider: 'gemini', model: gmodel };
+        }
+        errors.push(`gemini:${r.status}`);
+      } catch (e) { errors.push(`gemini:exc`); }
+    }
+  }
+
+  throw new Error(`All AI providers failed: ${errors.join(', ')}`);
+}
+
 // ===== Worker =====
 export default {
   async fetch(request, env) {
@@ -332,7 +411,7 @@ export default {
           return json({ error: 'Terlalu banyak permintaan AI. Coba lagi sebentar lagi.' }, 429);
         }
         if (param1 === 'insight' && method === 'POST') {
-          if (!env.NVIDIA_API_KEY) return error('AI belum dikonfigurasi di server', 503);
+          if (!env.GROQ_API_KEY && !env.NVIDIA_API_KEY && !env.GEMINI_API_KEY) return error('AI belum dikonfigurasi di server', 503);
           let body;
           try { body = await parseBody(request); } catch (e) {
             return e instanceof BodyTooLargeError ? json({ error: e.message }, 413) : error('Invalid body', 400);
@@ -347,34 +426,20 @@ export default {
           }).join('\n');
           const system = 'Kamu asisten finansial pribadi untuk pengguna Indonesia. Format jawaban dalam bullet-point bernomor (1. 2. 3.). Setiap poin harus menyebut angka spesifik dari data yang diberikan. Bahasa Indonesia santai dan actionable. Maksimal 5 poin. Jangan mengarang angka — hanya gunakan data yang tersedia.';
           const userMsg = (question ? `Pertanyaan: ${question}\n\n` : 'Beri ringkasan dan insight dari pantauan berikut:\n') + (lines || '(belum ada data pantauan)');
-          const model = env.NVIDIA_MODEL || 'meta/llama-3.1-8b-instruct';
           try {
-            const aiRes = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.NVIDIA_API_KEY}` },
-              body: JSON.stringify({
-                model,
-                messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }],
-                temperature: 0.4, max_tokens: 300, stream: false,
-              }),
-            });
-            if (!aiRes.ok) {
-              await log('ai.error', 'ai', null, { userId: authUser, status: aiRes.status });
-              return error('AI provider error', 502);
-            }
-            const data = await aiRes.json();
-            const insight = (data?.choices?.[0]?.message?.content || '').trim();
-            await log('ai.insight', 'ai', null, { userId: authUser, items: items.length });
-            return json({ insight, model });
+            const result = await callAIWithFallback(env, system, userMsg, 400, 0.3);
+            await log('ai.insight', 'ai', null, { userId: authUser, items: items.length, provider: result.provider });
+            return json({ insight: result.content, model: result.model, provider: result.provider });
           } catch (e) {
-            return error('Gagal memanggil AI', 502);
+            await log('ai.error', 'ai', null, { userId: authUser, error: String(e.message).slice(0, 120) });
+            return error('Semua provider AI sedang sibuk. Coba lagi.', 502);
           }
         }
 
         // /api/v2/ai/ask — free-form question answered with live web search
         // (Firecrawl) + the user's price data, summarised by NVIDIA NIM.
         if (param1 === 'ask' && method === 'POST') {
-          if (!env.NVIDIA_API_KEY) return error('AI belum dikonfigurasi di server', 503);
+          if (!env.GROQ_API_KEY && !env.NVIDIA_API_KEY && !env.GEMINI_API_KEY) return error('AI belum dikonfigurasi di server', 503);
           let body;
           try { body = await parseBody(request); } catch (e) {
             return e instanceof BodyTooLargeError ? json({ error: e.message }, 413) : error('Invalid body', 400);
@@ -417,27 +482,13 @@ export default {
             webContext ? `Hasil pencarian web terkini:\n${webContext}` : '',
             `Pertanyaan: ${question}`,
           ].filter(Boolean).join('\n\n');
-          const model = env.NVIDIA_MODEL || 'meta/llama-3.1-8b-instruct';
           try {
-            const aiRes = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.NVIDIA_API_KEY}` },
-              body: JSON.stringify({
-                model,
-                messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }],
-                temperature: 0.35, max_tokens: 600, stream: false,
-              }),
-            });
-            if (!aiRes.ok) {
-              await log('ai.error', 'ai', null, { userId: authUser, status: aiRes.status });
-              return error('AI provider error', 502);
-            }
-            const data = await aiRes.json();
-            const answer = (data?.choices?.[0]?.message?.content || '').trim();
-            await log('ai.ask', 'ai', null, { userId: authUser, web: sources.length });
-            return json({ answer, sources, model, usedWeb: sources.length > 0 });
+            const result = await callAIWithFallback(env, system, userMsg, 600, 0.35);
+            await log('ai.ask', 'ai', null, { userId: authUser, web: sources.length, provider: result.provider });
+            return json({ answer: result.content, sources, model: result.model, provider: result.provider, usedWeb: sources.length > 0 });
           } catch (e) {
-            return error('Gagal memanggil AI', 502);
+            await log('ai.error', 'ai', null, { userId: authUser, error: String(e.message).slice(0, 120) });
+            return error('Semua provider AI sedang sibuk. Coba lagi.', 502);
           }
         }
 
