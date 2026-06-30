@@ -31,11 +31,13 @@ export default function ProfilScreen() {
   ];
 
   const handleSync = useCallback(async () => {
+    setToastMsg("Menyimpan ke cloud");
+    setShowToast(true);
     await syncNow();
-    setToastMsg(syncing === "success" ? "Tersimpan!" : syncing === "error" ? "Gagal sync" : "Menyimpan...");
+    setToastMsg("Tersimpan ke cloud");
     setShowToast(true);
     setTimeout(() => setShowToast(false), 2000);
-  }, [syncNow, syncing]);
+  }, [syncNow]);
 
   const handleExport = useCallback(async () => {
     try {
@@ -81,10 +83,10 @@ export default function ProfilScreen() {
         {/* Sync */}
         <Card colors={colors} style={{ marginHorizontal: SPACING.lg, marginTop: SPACING.lg }}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <View>
+            <View style={{ flex: 1, paddingRight: SPACING.md }}>
               <Text style={[styles.menuLabel, { color: colors.text }]}>Sync ke Cloud</Text>
-              <Text style={{ color: colors.textTertiary, fontSize: 12, marginTop: 2 }}>
-                {syncing === "syncing" ? "Menyimpan..." : syncing === "success" ? "Tersimpan" : syncing === "error" ? "Gagal" : lastSyncAt ? `Terakhir: ${lastSyncAt.slice(0, 10)}` : "Belum pernah sync"}
+              <Text style={{ color: colors.textTertiary, fontSize: 12, marginTop: 2, lineHeight: 17 }}>
+                {syncing === "syncing" ? "Menyimpan" : syncing === "error" ? "Gagal — coba lagi" : lastSyncAt ? `Backup terakhir: ${lastSyncAt.slice(0, 10)}` : "Cadangkan catatan & pantauan kamu ke cloud biar aman dan balik lagi kalau ganti HP"}
               </Text>
             </View>
             <Button title="Sync" onPress={handleSync} variant={syncing === "success" ? "secondary" : "primary"} size="sm" colors={colors} icon="cloud-upload" loading={syncing === "syncing"} />
@@ -137,8 +139,8 @@ export default function ProfilScreen() {
 
         {/* About */}
         <Card colors={colors} style={{ marginHorizontal: SPACING.lg, marginTop: SPACING.lg }}>
-          <MenuItem icon="code-slash" label="PANTAU v2.0" />
-          <MenuItem icon="logo-github" label="GitHub" onPress={() => Linking.openURL("https://github.com/dokumenhilangid-blip/pantau")} />
+          <MenuItem icon="code-slash" label={`PANTAU v${CONFIG.version}`} />
+          <MenuItem icon="logo-github" label="GitHub" onPress={() => Linking.openURL("https://github.com/jhonsonsmith694-pixel/pantau-app")} />
         </Card>
 
         {/* Logout */}
@@ -147,7 +149,7 @@ export default function ProfilScreen() {
         </View>
 
         {/* Footer */}
-        <Text style={{ textAlign: "center", color: colors.textTertiary, fontSize: 12, paddingBottom: SPACING.xl }}>Made with ❤️ by Bara • AI Personal Monitor</Text>
+        <Text style={{ textAlign: "center", color: colors.textTertiary, fontSize: 12, paddingBottom: SPACING.xl, fontFamily: "Outfit_400Regular" }}>Dibuat oleh Bara · AI Personal Monitor</Text>
       </ScrollView>
 
       <ConfirmDialog visible={showLogout} title="Logout" message="Semua data lokal akan dihapus. Lanjutkan?" confirmLabel="Logout" onConfirm={() => { setShowLogout(false); logout(); }} onCancel={() => setShowLogout(false)} destructive colors={colors} />
@@ -160,13 +162,13 @@ export default function ProfilScreen() {
 const styles = StyleSheet.create({
   profileCard: { alignItems: "center", paddingVertical: SPACING.xxl, borderBottomWidth: 1 },
   avatar: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", marginBottom: SPACING.md },
-  profileName: { fontSize: 20, fontWeight: "700" },
-  profileSub: { fontSize: 13, marginTop: 2 },
+  profileName: { fontSize: 20, fontFamily: "Outfit_700Bold" },
+  profileSub: { fontSize: 13, marginTop: 2, fontFamily: "Outfit_400Regular" },
   section: { marginBottom: SPACING.sm },
-  sectionTitle: { fontSize: 14, fontWeight: "600" },
+  sectionTitle: { fontSize: 14, fontFamily: "Outfit_600SemiBold" },
   menuItem: { flexDirection: "row", alignItems: "center", paddingVertical: SPACING.md, borderBottomWidth: 0.5 },
   menuIcon: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center", marginRight: SPACING.md },
-  menuLabel: { fontSize: 14, flex: 1 },
-  menuValue: { fontSize: 12, marginRight: 8 },
+  menuLabel: { fontSize: 14, flex: 1, fontFamily: "Outfit_500Medium" },
+  menuValue: { fontSize: 12, marginRight: 8, fontFamily: "Outfit_400Regular" },
   themeOpt: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, borderRadius: BORDER_RADIUS.md, borderWidth: 1 },
 });

@@ -15,10 +15,10 @@ import { security } from "../../src/services/security";
 type Msg = { id: string; role: "user" | "ai"; text: string; model?: string; sources?: { title: string; url: string }[]; usedWeb?: boolean };
 
 const SUGGESTIONS = [
-  "Ringkas semua pantauan saya",
-  "Berita crypto terbaru hari ini?",
-  "Bitcoin lagi naik atau turun?",
-  "Apa yang bagus saya pantau?",
+  "Harga beras hari ini?",
+  "Berita bola terbaru",
+  "Harga emas Antam sekarang",
+  "Ringkas pantauan saya",
 ];
 
 export default function AiScreen() {
@@ -126,7 +126,7 @@ export default function AiScreen() {
                 </View>
                 <Text style={[styles.introTitle, { color: colors.text }]}>Mulai ngobrol</Text>
                 <Text style={[styles.introDesc, { color: colors.textSecondary }]}>
-                  Aku bisa meringkas pantauan, baca tren harga, dan kasih saran apa yang layak dipantau.
+                  Aku bisa cari info terkini di web (harga, berita) lalu meringkasnya, plus baca pantauan kamu. Coba salah satu di bawah.
                 </Text>
               </View>
             </FadeInView>
@@ -170,7 +170,10 @@ export default function AiScreen() {
                 <Ionicons name="sparkles" size={14} color={colors.primary} />
               </View>
               <Animated.View style={[styles.bubbleAi, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pulse }]}>
-                <Text style={[styles.bubbleAiText, { color: colors.textSecondary }]}>Sedang berpikir…</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Ionicons name="globe-outline" size={14} color={colors.primary} />
+                  <Text style={[styles.bubbleAiText, { color: colors.textSecondary }]}>Mencari di web & menyusun jawaban…</Text>
+                </View>
               </Animated.View>
             </View>
           )}

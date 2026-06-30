@@ -19,6 +19,15 @@ type QuoteState =
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
+// Per-category icon so the monitor list reads visually, not just text.
+const CAT_ICON: Record<string, IconName> = {
+  harga: "cash-outline",
+  berita: "newspaper-outline",
+  stok: "cube-outline",
+  jadwal: "calendar-outline",
+};
+const catIcon = (c: string): IconName => CAT_ICON[c] || "pricetag-outline";
+
 export default function PantauScreen() {
   const { monitors, addMonitor, editMonitor, toggleMonitor, deleteMonitor } = useApp();
   const { colors, isDark } = useTheme();
@@ -137,14 +146,16 @@ export default function PantauScreen() {
   const renderItem = useCallback(({ item }: { item: typeof monitors[0] }) => (
     <TouchableOpacity onPress={() => toggleMonitor(item.id)} onLongPress={() => handleEdit(item)} activeOpacity={0.7}>
       <Card colors={colors} style={{ flexDirection: "row", alignItems: "center", paddingVertical: SPACING.md }}>
-        <TouchableOpacity onPress={() => toggleMonitor(item.id)} style={{ marginRight: SPACING.md }}>
+        <TouchableOpacity onPress={() => toggleMonitor(item.id)} style={{ marginRight: SPACING.sm }}>
           <Ionicons name={item.active ? "checkmark-circle" : "ellipse-outline"} size={24} color={item.active ? colors.success : colors.textTertiary} />
         </TouchableOpacity>
-        <View style={{ flex: 1 }}>
+        <View style={[styles.catIcon, { backgroundColor: colors.accentSoft, opacity: item.active ? 1 : 0.5 }]}>
+          <Ionicons name={catIcon(item.category)} size={18} color={colors.primary} />
+        </View>
+        <View style={{ flex: 1, marginLeft: SPACING.md }}>
           <Text style={[styles.itemTitle, { color: colors.text }]}>{item.title}</Text>
           {renderQuote(item)}
         </View>
-        <Badge label={item.category} color={colors.primary} colors={colors} />
         <TouchableOpacity onPress={() => handleDelete(item.id, item.title)} style={{ marginLeft: SPACING.sm, padding: 4 }}>
           <Ionicons name="trash-outline" size={18} color={colors.textTertiary} />
         </TouchableOpacity>
@@ -279,6 +290,7 @@ const styles = StyleSheet.create({
   itemTitle: { fontSize: 15, fontFamily: FONTS.semibold.fontFamily },
   itemMeta: { fontSize: 12, marginTop: 2, fontFamily: FONTS.regular.fontFamily },
   itemValue: { fontSize: 16, letterSpacing: -0.3 },
+  catIcon: { width: 38, height: 38, borderRadius: BORDER_RADIUS.md, alignItems: "center", justifyContent: "center" },
   itemSource: { fontSize: 10, marginLeft: 8, marginTop: 1 },
   aiCard: { flexDirection: "row", alignItems: "center", gap: SPACING.md, marginHorizontal: SPACING.lg, marginBottom: SPACING.sm, padding: SPACING.md, borderRadius: BORDER_RADIUS.lg, borderWidth: 1 },
   aiIcon: { width: 38, height: 38, borderRadius: BORDER_RADIUS.md, alignItems: "center", justifyContent: "center" },

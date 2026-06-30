@@ -1,13 +1,13 @@
-import { useState, useCallback, useMemo } from "react";
-import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, FlatList, Keyboard, Alert, Share } from "react-native";
+import { useState, useCallback, useMemo, useRef } from "react";
+import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, FlatList, Keyboard, Alert, Share, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useApp } from "../../src/hooks/useApp";
 import { useTheme, useDebounce } from "../../src/hooks";
-import { Card, EmptyState, Badge, Button } from "../../src/components";
+import { Card, EmptyState, Badge, Button, Toast } from "../../src/components";
 import { NOTE_CATEGORIES, NOTE_COLORS } from "../../src/types";
-import { SPACING, BORDER_RADIUS } from "../../src/config";
+import { SPACING, BORDER_RADIUS, FONTS } from "../../src/config";
 
 export default function CatatanScreen() {
   const { notes, addNote, editNote, deleteNote, togglePin } = useApp();
@@ -28,6 +28,14 @@ export default function CatatanScreen() {
   const [editCategory, setEditCategory] = useState("Umum");
   const [editColor, setEditColor] = useState("#FFFFFF");
   const [detailNote, setDetailNote] = useState<typeof notes[0] | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2000);
+  }, []);
 
   const filteredNotes = useMemo(() => {
     const q = db.toLowerCase();
@@ -42,14 +50,16 @@ export default function CatatanScreen() {
   const unpinnedNotes = useMemo(() => filteredNotes.filter(n => !n.pinned), [filteredNotes]);
 
   const handleAdd = useCallback(() => {
-    if (!newTitle.trim() || !newContent.trim()) return;
+    if (!newTitle.trim()) return;          // title is enough; content is optional
     addNote(newTitle.trim(), newContent.trim(), newCategory, newColor);
     setNewTitle("");
     setNewContent("");
     setNewCategory("Umum");
     setNewColor("#FFFFFF");
     setShowForm(false);
-  }, [newTitle, newContent, newCategory, newColor, addNote]);
+    Keyboard.dismiss();
+    showToast("Catatan tersimpan");
+  }, [newTitle, newContent, newCategory, newColor, addNote, showToast]);
 
   const handleEdit = useCallback((n: typeof notes[0]) => {
     setEditingNote(n);
@@ -63,7 +73,9 @@ export default function CatatanScreen() {
     if (!editingNote || !editTitle.trim()) return;
     editNote(editingNote.id, editTitle.trim(), editContent.trim(), editCategory, editColor);
     setEditingNote(null);
-  }, [editingNote, editTitle, editContent, editCategory, editColor, editNote]);
+    Keyboard.dismiss();
+    showToast("Perubahan tersimpan");
+  }, [editingNote, editTitle, editContent, editCategory, editColor, editNote, showToast]);
 
   const handleDelete = useCallback((id: number, title: string) => {
     Alert.alert("Hapus Catatan", `Hapus catatan "${title}"?`, [
@@ -114,8 +126,12 @@ export default function CatatanScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Catatan</Text>
-        <Text style={[styles.headerSub, { color: colors.textTertiary }]}>{notes.length} catatan</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Catatan</Text>
+          <Text style={[styles.headerSub, { color: colors.textSecondary }]}>
+            Simpan ide, daftar, info penting · {notes.length} catatan
+          </Text>
+        </View>
       </View>
 
       {/* Search */}
@@ -137,7 +153,7 @@ export default function CatatanScreen() {
       {editingNote && (
         <View style={[styles.overlay, { backgroundColor: colors.overlay }]}>
           <View style={[styles.modal, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Catatan</Text>
+            <Text style={[styles.modalTitle, { color: colors.text, marginBottom: SPACING.lg }]}>Edit Catatan</Text>
             <TextInput style={[styles.input, { backgroundColor: colors.surfaceSecondary, color: colors.text, borderColor: colors.border }]} value={editTitle} onChangeText={setEditTitle} placeholder="Judul" placeholderTextColor={colors.textTertiary} />
             <TextInput style={[styles.input, styles.textArea, { backgroundColor: colors.surfaceSecondary, color: colors.text, borderColor: colors.border }]} value={editContent} onChangeText={setEditContent} placeholder="Isi catatan..." placeholderTextColor={colors.textTertiary} multiline />
             <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
@@ -198,7 +214,7 @@ export default function CatatanScreen() {
         contentContainerStyle={{ padding: SPACING.lg, paddingBottom: 120 }}
         keyboardShouldPersistTaps="handled"
         onScrollBeginDrag={Keyboard.dismiss}
-        ListEmptyComponent={<EmptyState icon="document-text-outline" title="Belum Ada Catatan" description="Tambahkan catatan baru" action={{ label: "Buat Catatan", onPress: () => setShowForm(true) }} colors={colors} />}
+        ListEmptyComponent={<EmptyState icon="document-text-outline" title="Belum ada catatan" description="Simpan ide, daftar belanja, atau info penting di sini" action={{ label: "Buat catatan", onPress: () => setShowForm(true) }} colors={colors} />}
       />
 
       {/* FAB */}
@@ -206,51 +222,68 @@ export default function CatatanScreen() {
         <Ionicons name={showForm ? "close" : "add"} size={24} color="#FFF" />
       </TouchableOpacity>
 
-      {/* Add Form */}
+      {/* Add Form — keyboard-safe centered modal so Simpan is always reachable */}
       {showForm && (
-        <View style={[styles.formPanel, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
-          <TextInput style={[styles.input, { backgroundColor: colors.surfaceSecondary, color: colors.text, borderColor: colors.border }]} value={newTitle} onChangeText={setNewTitle} placeholder="Judul catatan..." placeholderTextColor={colors.textTertiary} />
-          <TextInput style={[styles.input, styles.textArea, { backgroundColor: colors.surfaceSecondary, color: colors.text, borderColor: colors.border }]} value={newContent} onChangeText={setNewContent} placeholder="Isi catatan..." placeholderTextColor={colors.textTertiary} multiline />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
-            {NOTE_CATEGORIES.map(c => (
-              <TouchableOpacity key={c} onPress={() => setNewCategory(c)} style={[styles.catChip, { backgroundColor: newCategory === c ? colors.primary : colors.surfaceSecondary, borderColor: colors.border }]}>
-                <Text style={{ color: newCategory === c ? "#FFF" : colors.text, fontSize: 11 }}>{c}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-          <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
-            {NOTE_COLORS.map(c => (
-              <TouchableOpacity key={c} onPress={() => setNewColor(c)} style={[styles.colorDot, { backgroundColor: c, borderWidth: newColor === c ? 2 : 1, borderColor: newColor === c ? colors.primary : colors.border }]} />
-            ))}
-          </View>
-          <Button title="Simpan" onPress={handleAdd} colors={colors} disabled={!newTitle.trim() || !newContent.trim()} />
+        <View style={[styles.overlay, { backgroundColor: colors.overlay }]}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.kav}>
+            <View style={[styles.modal, { backgroundColor: colors.surface }]}>
+              <View style={styles.modalHead}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Catatan baru</Text>
+                <TouchableOpacity onPress={() => { setShowForm(false); Keyboard.dismiss(); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="close" size={22} color={colors.textTertiary} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }}>
+                <TextInput style={[styles.input, { backgroundColor: colors.surfaceSecondary, color: colors.text, borderColor: colors.border }]} value={newTitle} onChangeText={setNewTitle} placeholder="Judul catatan" placeholderTextColor={colors.textTertiary} autoFocus />
+                <TextInput style={[styles.input, styles.textArea, { backgroundColor: colors.surfaceSecondary, color: colors.text, borderColor: colors.border }]} value={newContent} onChangeText={setNewContent} placeholder="Isi catatan (opsional)…" placeholderTextColor={colors.textTertiary} multiline />
+                <Text style={[styles.helper, { color: colors.textTertiary }]}>Judul aja udah cukup — isi boleh dikosongin.</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }} keyboardShouldPersistTaps="handled">
+                  {NOTE_CATEGORIES.map(c => (
+                    <TouchableOpacity key={c} onPress={() => setNewCategory(c)} style={[styles.catChip, { backgroundColor: newCategory === c ? colors.primary : colors.surfaceSecondary, borderColor: colors.border }]}>
+                      <Text style={{ color: newCategory === c ? "#FFF" : colors.text, fontSize: 11, fontFamily: FONTS.medium.fontFamily }}>{c}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <View style={{ flexDirection: "row", gap: 8, marginBottom: 14 }}>
+                  {NOTE_COLORS.map(c => (
+                    <TouchableOpacity key={c} onPress={() => setNewColor(c)} style={[styles.colorDot, { backgroundColor: c, borderWidth: newColor === c ? 2 : 1, borderColor: newColor === c ? colors.primary : colors.border }]} />
+                  ))}
+                </View>
+                <Button title="Simpan catatan" onPress={handleAdd} colors={colors} disabled={!newTitle.trim()} />
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
         </View>
       )}
+
+      <Toast visible={!!toast} message={toast || ""} type="success" icon="checkmark-circle" colors={colors} />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   header: { paddingHorizontal: SPACING.xl, paddingVertical: SPACING.lg, borderBottomWidth: 1, flexDirection: "row", alignItems: "center" },
-  headerTitle: { fontSize: 24, fontWeight: "800", letterSpacing: -0.5 },
-  headerSub: { fontSize: 13, marginTop: 2 },
-  searchBar: { flexDirection: "row", alignItems: "center", margin: SPACING.lg, borderWidth: 1, borderRadius: BORDER_RADIUS.lg, paddingHorizontal: SPACING.md, height: 42 },
-  searchInput: { flex: 1, marginLeft: 8, fontSize: 14 },
+  headerTitle: { fontSize: 26, fontFamily: FONTS.h1.fontFamily, letterSpacing: -0.6 },
+  headerSub: { fontSize: 13, marginTop: 4, fontFamily: FONTS.regular.fontFamily, lineHeight: 18 },
+  searchBar: { flexDirection: "row", alignItems: "center", margin: SPACING.lg, borderWidth: 1, borderRadius: BORDER_RADIUS.lg, paddingHorizontal: SPACING.md, height: 44 },
+  searchInput: { flex: 1, marginLeft: 8, fontSize: 14, fontFamily: FONTS.regular.fontFamily },
   catBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: BORDER_RADIUS.full, borderWidth: 1, marginRight: 8 },
-  catText: { fontSize: 13, fontWeight: "500" },
+  catText: { fontSize: 13, fontFamily: FONTS.medium.fontFamily },
   catChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: BORDER_RADIUS.full, borderWidth: 1, marginRight: 6 },
   noteCard: { paddingVertical: SPACING.md },
-  noteTitle: { fontSize: 15, fontWeight: "600" },
-  noteContent: { fontSize: 13, marginTop: 4, lineHeight: 18 },
-  sectionDivider: { fontSize: 12, fontWeight: "600", marginVertical: SPACING.sm, paddingHorizontal: 4 },
-  overlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", zIndex: 100 },
-  modal: { width: 320, borderRadius: BORDER_RADIUS.xl, padding: SPACING.xl },
-  modalTitle: { fontSize: 18, fontWeight: "700", marginBottom: SPACING.lg },
-  input: { borderWidth: 1, borderRadius: BORDER_RADIUS.md, paddingHorizontal: 12, height: 40, fontSize: 14, marginBottom: 8 },
-  textArea: { height: 80, textAlignVertical: "top", paddingTop: 8 },
-  colorDot: { width: 24, height: 24, borderRadius: 12 },
-  editBtn: { flex: 1, paddingVertical: 10, borderRadius: BORDER_RADIUS.md, alignItems: "center" },
-  fab: { position: "absolute", bottom: 100, right: SPACING.lg, width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center", elevation: 6, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, zIndex: 10 },
-  formPanel: { position: "absolute", bottom: 0, left: 0, right: 0, padding: SPACING.lg, paddingBottom: SPACING.xxxl, borderTopWidth: 1, zIndex: 20 },
-  detailContent: { fontSize: 15 },
+  noteTitle: { fontSize: 15, fontFamily: FONTS.semibold.fontFamily },
+  noteContent: { fontSize: 13, marginTop: 4, lineHeight: 18, fontFamily: FONTS.regular.fontFamily },
+  sectionDivider: { fontSize: 12, fontFamily: FONTS.semibold.fontFamily, marginVertical: SPACING.sm, paddingHorizontal: 4 },
+  overlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", zIndex: 100, paddingHorizontal: SPACING.lg },
+  kav: { width: "100%", alignItems: "center", justifyContent: "center" },
+  modal: { width: "100%", maxWidth: 360, borderRadius: BORDER_RADIUS.xl, padding: SPACING.xl },
+  modalHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: SPACING.lg },
+  modalTitle: { fontSize: 18, fontFamily: FONTS.bold.fontFamily },
+  helper: { fontSize: 12, marginBottom: SPACING.md, marginTop: -2, fontFamily: FONTS.regular.fontFamily },
+  input: { borderWidth: 1, borderRadius: BORDER_RADIUS.md, paddingHorizontal: 12, minHeight: 44, fontSize: 14, marginBottom: 8, fontFamily: FONTS.regular.fontFamily, paddingVertical: 10 },
+  textArea: { minHeight: 90, textAlignVertical: "top", paddingTop: 10 },
+  colorDot: { width: 26, height: 26, borderRadius: 13 },
+  editBtn: { flex: 1, paddingVertical: 11, borderRadius: BORDER_RADIUS.md, alignItems: "center" },
+  fab: { position: "absolute", bottom: 100, right: SPACING.lg, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", elevation: 6, shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6, zIndex: 10 },
+  detailContent: { fontSize: 15, fontFamily: FONTS.regular.fontFamily },
 });
