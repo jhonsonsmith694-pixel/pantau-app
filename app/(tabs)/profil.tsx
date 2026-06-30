@@ -2,12 +2,16 @@ import { useState, useCallback, useMemo } from "react";
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Switch, Alert, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import * as WebBrowser from "expo-web-browser";
+import * as AuthSession from "expo-auth-session/providers/google";
 import { useApp } from "../../src/hooks/useApp";
 import { useTheme } from "../../src/hooks";
 import { Card, Button, ConfirmDialog, Toast } from "../../src/components";
 import { getStorageUsage } from "../../src/storage";
 import { CONFIG, SPACING, BORDER_RADIUS } from "../../src/config";
 import { ThemeMode } from "../../src/types";
+
+WebBrowser.maybeCompleteAuthSession();
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -18,6 +22,35 @@ export default function ProfilScreen() {
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
   const [storageInfo, setStorageInfo] = useState<{ used: number; items: Record<string, number> } | null>(null);
+  const [googleUser, setGoogleUser] = useState<{ name: string; email: string } | null>(null);
+
+  // Google OAuth - uses Expo proxy for simplicity (no native module needed)
+  const [_request, response, promptAsync] = AuthSession.useAuthRequest({
+    androidClientId: "placeholder-android-client-id.apps.googleusercontent.com",
+    webClientId: "placeholder-web-client-id.apps.googleusercontent.com",
+    scopes: ["openid", "profile", "email"],
+  });
+
+  const handleGoogleLogin = useCallback(async () => {
+    try {
+      const result = await promptAsync();
+      if (result?.type === "success" && result.authentication?.accessToken) {
+        // Fetch user info from Google
+        const userInfoRes = await fetch("https://www.googleapis.com/userinfo/v2/me", {
+          headers: { Authorization: `Bearer ${result.authentication.accessToken}` },
+        });
+        if (userInfoRes.ok) {
+          const info = await userInfoRes.json();
+          setGoogleUser({ name: info.name || info.email, email: info.email });
+          setToastMsg(`Login sebagai ${info.email}`);
+          setShowToast(true);
+          setTimeout(() => setShowToast(false), 3000);
+        }
+      }
+    } catch (e) {
+      Alert.alert("Google Login", "Gagal login. Pastikan Google Play Services tersedia.");
+    }
+  }, [promptAsync]);
 
   const loadStorage = useCallback(async () => {
     const info = await getStorageUsage();
@@ -76,8 +109,16 @@ export default function ProfilScreen() {
           <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
             <Ionicons name={user?.avatar as IconName || "person"} size={28} color="#FFF" />
           </View>
-          <Text style={[styles.profileName, { color: colors.text }]}>{user?.name || "Pengguna"}</Text>
-          <Text style={[styles.profileSub, { color: colors.textTertiary }]}>Mode: {syncing === "success" ? "Online" : "Offline-First"}</Text>
+          <Text style={[styles.profileName, { color: colors.text }]}>{googleUser?.name || user?.name || "Pengguna"}</Text>
+          <Text style={[styles.profileSub, { color: colors.textTertiary }]}>
+            {googleUser?.email || (syncing === "success" ? "Online" : "Offline-First")}
+          </Text>
+          {!googleUser && (
+            <TouchableOpacity onPress={handleGoogleLogin} style={[styles.googleBtn, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
+              <Ionicons name="logo-google" size={18} color="#4285F4" />
+              <Text style={[styles.googleBtnText, { color: colors.text }]}>Login dengan Gmail</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Sync */}
@@ -164,6 +205,8 @@ const styles = StyleSheet.create({
   avatar: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", marginBottom: SPACING.md },
   profileName: { fontSize: 20, fontFamily: "Outfit_700Bold" },
   profileSub: { fontSize: 13, marginTop: 2, fontFamily: "Outfit_400Regular" },
+  googleBtn: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: SPACING.md, paddingHorizontal: 20, paddingVertical: 10, borderRadius: BORDER_RADIUS.full, borderWidth: 1 },
+  googleBtnText: { fontSize: 14, fontFamily: "Outfit_500Medium" },
   section: { marginBottom: SPACING.sm },
   sectionTitle: { fontSize: 14, fontFamily: "Outfit_600SemiBold" },
   menuItem: { flexDirection: "row", alignItems: "center", paddingVertical: SPACING.md, borderBottomWidth: 0.5 },

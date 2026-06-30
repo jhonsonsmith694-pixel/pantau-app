@@ -73,6 +73,7 @@ function RootNavigator() {
       }}>
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="monitor/[id]" options={{ animation: "slide_from_right" }} />
       </Stack>
     </>
   );

@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
-import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, FlatList, Keyboard, Alert, RefreshControl, Platform } from "react-native";
+import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, FlatList, Keyboard, Alert, RefreshControl, Platform, KeyboardAvoidingView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -197,7 +197,7 @@ export default function PantauScreen() {
 
     return (
       <FadeInView index={index} style={{ marginBottom: SPACING.sm }}>
-        <PressableScale onPress={() => toggleMonitor(item.id)} onLongPress={() => handleEdit(item)}>
+        <PressableScale onPress={() => router.push(`/monitor/${item.id}`)} onLongPress={() => handleEdit(item)}>
           <View style={[styles.monitorCard, {
             backgroundColor: colors.surface,
             borderColor: colors.border,
@@ -258,6 +258,11 @@ export default function PantauScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      >
       {/* Gradient Header */}
       <LinearGradient colors={colors.gradient as [string, string]} style={styles.gradientHeader}>
         <View style={styles.headerContent}>
@@ -355,7 +360,7 @@ export default function PantauScreen() {
           data={filteredMonitors}
           renderItem={renderItem}
           keyExtractor={item => String(item.id)}
-          contentContainerStyle={{ padding: SPACING.lg, paddingBottom: 140 }}
+          contentContainerStyle={{ padding: SPACING.lg, paddingBottom: SPACING.lg }}
           keyboardShouldPersistTaps="handled"
           onScrollBeginDrag={Keyboard.dismiss}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
@@ -383,6 +388,7 @@ export default function PantauScreen() {
           <Ionicons name="add" size={20} color="#FFF" />
         </TouchableOpacity>
       </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -553,12 +559,8 @@ const styles = StyleSheet.create({
   aiTitle: { fontSize: 14, fontFamily: FONT_FAMILY.semibold },
   aiBody: { fontSize: 13, lineHeight: 18, marginTop: 2, fontFamily: FONT_FAMILY.regular },
   bottomBar: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
     padding: SPACING.lg,
-    paddingBottom: SPACING.xxxl,
+    paddingBottom: SPACING.lg,
     borderTopWidth: 1,
   },
   bottomInput: {

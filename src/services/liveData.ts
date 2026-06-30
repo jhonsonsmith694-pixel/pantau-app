@@ -114,8 +114,8 @@ export function resolveMonitor(title: string, _category: string): FetchSpec | nu
   return null;
 }
 
-export function isSupported(title: string, category: string): boolean {
-  return resolveMonitor(title, category) !== null;
+export function isSupported(_title: string, _category: string): boolean {
+  return true; // All items are supported via CoinGecko OR Firecrawl fallback
 }
 
 async function fetchCrypto(coinId: string): Promise<{ value: number; change: number | null }> {
