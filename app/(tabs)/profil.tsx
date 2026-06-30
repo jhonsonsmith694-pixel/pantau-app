@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
 import * as AuthSession from "expo-auth-session/providers/google";
+import { makeRedirectUri } from "expo-auth-session";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { useApp } from "../../src/hooks/useApp";
@@ -11,7 +12,7 @@ import { useTheme } from "../../src/hooks";
 import { Card, Button, ConfirmDialog, Toast } from "../../src/components";
 import { getStorageUsage, loadMonitors, loadNotes } from "../../src/storage";
 import { CONFIG, SPACING, BORDER_RADIUS } from "../../src/config";
-import { setLang, getLang, Lang } from "../../src/services/i18n";
+import { Lang } from "../../src/services/i18n";
 import { ThemeMode } from "../../src/types";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -19,25 +20,24 @@ WebBrowser.maybeCompleteAuthSession();
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
 export default function ProfilScreen() {
-  const { user, logout, notificationEnabled, setNotificationEnabled, syncing, syncNow, lastSyncAt, themeMode, setThemeMode } = useApp();
+  const { user, logout, notificationEnabled, setNotificationEnabled, syncing, syncNow, lastSyncAt, themeMode, setThemeMode, language, setLanguage } = useApp();
   const { colors, isDark } = useTheme();
   const [showLogout, setShowLogout] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
   const [storageInfo, setStorageInfo] = useState<{ used: number; items: Record<string, number> } | null>(null);
   const [googleUser, setGoogleUser] = useState<{ name: string; email: string } | null>(null);
-  const [lang, setLangState] = useState<Lang>(getLang());
-
-  const changeLang = useCallback((l: Lang) => {
-    setLang(l);
-    setLangState(l);
-  }, []);
+  const lang = language;
+  const changeLang = useCallback((l: Lang) => { setLanguage(l); }, [setLanguage]);
 
   // Google OAuth - uses Expo proxy for simplicity (no native module needed)
   const [_request, response, promptAsync] = AuthSession.useAuthRequest({
     androidClientId: "584320999728-atp60cp5f1kep6on205c50tcu2bd86ru.apps.googleusercontent.com",
     webClientId: "584320999728-atp60cp5f1kep6on205c50tcu2bd86ru.apps.googleusercontent.com",
     scopes: ["openid", "profile", "email"],
+    redirectUri: makeRedirectUri({
+      native: "com.googleusercontent.apps.584320999728-atp60cp5f1kep6on205c50tcu2bd86ru:/oauth2redirect",
+    }),
   });
 
   const handleGoogleLogin = useCallback(async () => {

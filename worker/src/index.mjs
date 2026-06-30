@@ -389,11 +389,16 @@ export default {
             return json({ snippet: null, source: null, url: null, updatedAt: now() });
           }
           const fc = await fcRes.json();
-          const results = (fc?.data?.web || fc?.data || []).slice(0, 2);
+          const results = (fc?.data?.web || fc?.data || []).slice(0, 3);
           if (!results.length) return json({ snippet: null, source: null, url: null, updatedAt: now() });
 
+          // Combine the top results into a fuller, more useful snippet.
           const best = results[0];
-          const snippet = String(best.description || best.snippet || best.title || '').slice(0, 300);
+          const parts = results
+            .map(r => String(r.description || r.snippet || '').trim())
+            .filter(Boolean);
+          let snippet = parts.join(' ').slice(0, 480);
+          if (!snippet) snippet = String(best.title || '').slice(0, 200);
           const source = String(best.title || '').slice(0, 120);
           const resultUrl = best.url || null;
           await log('scrape.success', 'monitor', null, { userId: authUser, title, source });

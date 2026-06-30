@@ -13,20 +13,25 @@ const TASK_NAME = 'pantau-price-alert-check';
 const MONITORS_KEY = `${CONFIG.storagePrefix}monitors`;
 
 // Define the task once at module load (required by expo-task-manager).
-if (!TaskManager.isTaskDefined(TASK_NAME)) {
-  TaskManager.defineTask(TASK_NAME, async () => {
-    try {
-      const raw = await AsyncStorage.getItem(MONITORS_KEY);
-      const monitors: Monitor[] = raw ? JSON.parse(raw) : [];
-      const triggered = await checkAlerts(monitors);
-      return triggered.length > 0
-        ? BackgroundFetch.BackgroundFetchResult.NewData
-        : BackgroundFetch.BackgroundFetchResult.NoData;
-    } catch (e: any) {
-      logger.warn(`Background task failed: ${e?.message}`, undefined, 'background');
-      return BackgroundFetch.BackgroundFetchResult.Failed;
-    }
-  });
+// Wrapped defensively: a native-module hiccup here must never crash the app.
+try {
+  if (!TaskManager.isTaskDefined(TASK_NAME)) {
+    TaskManager.defineTask(TASK_NAME, async () => {
+      try {
+        const raw = await AsyncStorage.getItem(MONITORS_KEY);
+        const monitors: Monitor[] = raw ? JSON.parse(raw) : [];
+        const triggered = await checkAlerts(monitors);
+        return triggered.length > 0
+          ? BackgroundFetch.BackgroundFetchResult.NewData
+          : BackgroundFetch.BackgroundFetchResult.NoData;
+      } catch (e: any) {
+        logger.warn(`Background task failed: ${e?.message}`, undefined, 'background');
+        return BackgroundFetch.BackgroundFetchResult.Failed;
+      }
+    });
+  }
+} catch (e: any) {
+  logger.warn(`defineTask failed: ${e?.message}`, undefined, 'background');
 }
 
 export async function registerBackgroundFetch(): Promise<void> {

@@ -17,8 +17,8 @@ import { registerBackgroundFetch } from "../src/services/background";
 
 SplashScreen.preventAutoHideAsync();
 
-// Configure notification display behavior once at module load.
-configureNotificationHandler();
+// Configure notification display behavior once at module load (defensive).
+try { configureNotificationHandler(); } catch {}
 
 // Global baseline font so every Text without an explicit family uses Outfit
 // (taste skills ban system defaults). Headers/labels override with their own weight.

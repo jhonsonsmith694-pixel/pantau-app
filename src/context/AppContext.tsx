@@ -10,6 +10,7 @@ import { analytics } from '../services/analytics';
 import { userRepo, monitorRepo, noteRepo, settingsRepo, syncRepo } from '../repository';
 import { api } from '../api/client';
 import { security } from '../services/security';
+import { setLang } from '../services/i18n';
 
 export type AppContextType = {
   user: { name: string; avatar: string } | null;
@@ -31,6 +32,8 @@ export type AppContextType = {
   themeMode: ThemeMode;
   setThemeMode: (m: ThemeMode) => void;
   colorScheme: 'light' | 'dark';
+  language: 'id' | 'en';
+  setLanguage: (l: 'id' | 'en') => void;
   notificationEnabled: boolean;
   setNotificationEnabled: (v: boolean) => void;
   syncing: SyncStatus;
@@ -67,6 +70,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [themeMode, setThemeModeState] = useState<ThemeMode>('system');
   const [notificationEnabled, setNotificationState] = useState(false);
+  const [language, setLanguageState] = useState<'id' | 'en'>('id');
   const [syncing, setSyncing] = useState<SyncStatus>('idle');
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
 
@@ -239,6 +243,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const setThemeMode = useCallback((m: ThemeMode) => setThemeModeState(m), []);
   const setNotificationEnabled = useCallback((v: boolean) => setNotificationState(v), []);
+  const setLanguage = useCallback((l: 'id' | 'en') => { setLang(l); setLanguageState(l); }, []);
 
   const value = useMemo(() => ({
     user, setUser, logout,
@@ -246,6 +251,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toggleFavorite, setMonitorAlert, setMonitorFolder,
     notes, addNote, editNote, deleteNote, togglePin,
     themeMode, setThemeMode, colorScheme,
+    language, setLanguage,
     notificationEnabled, setNotificationEnabled,
     syncing, syncNow, lastSyncAt,
     loaded,
@@ -255,6 +261,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toggleFavorite, setMonitorAlert, setMonitorFolder,
     notes, addNote, editNote, deleteNote, togglePin,
     themeMode, setThemeMode, colorScheme,
+    language, setLanguage,
     notificationEnabled, setNotificationEnabled,
     syncing, syncNow, lastSyncAt, loaded,
   ]);

@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "scheme": "pantau",
+    "scheme": ["pantau", "com.googleusercontent.apps.584320999728-atp60cp5f1kep6on205c50tcu2bd86ru"],
     "ios": {
       "supportsTablet": true,
       "infoPlist": {

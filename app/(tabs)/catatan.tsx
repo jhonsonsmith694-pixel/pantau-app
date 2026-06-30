@@ -41,7 +41,9 @@ export default function CatatanScreen() {
     const q = db.toLowerCase();
     return notes.filter(n => {
       const matchCat = activeCategory === "Semua" || n.category === activeCategory;
-      const matchSearch = n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q);
+      const title = (n.title || "").toLowerCase();
+      const content = (n.content || "").toLowerCase();
+      const matchSearch = title.includes(q) || content.includes(q);
       return matchCat && matchSearch;
     });
   }, [notes, db, activeCategory]);

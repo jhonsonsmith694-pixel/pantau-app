@@ -51,6 +51,7 @@ export default function PantauScreen() {
   const [activeCategory, setActiveCategory] = useState("semua");
   const [newTitle, setNewTitle] = useState("");
   const [newCat, setNewCat] = useState("harga");
+  const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editCat, setEditCat] = useState("harga");
@@ -98,7 +99,12 @@ export default function PantauScreen() {
     const st = quotes[m.id];
     if (!st || st.status === "loading") return null; // skeleton handles loading state
     if (st.status === "manual") {
-      return <Text style={[styles.itemMeta, { color: colors.textTertiary }]}>Pantauan manual · belum ada data</Text>;
+      return (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 }}>
+          <Ionicons name="sparkles-outline" size={12} color={colors.primary} />
+          <Text style={[styles.itemMeta, { color: colors.primary }]}>Ketuk untuk lihat detail & tanya AI</Text>
+        </View>
+      );
     }
     if (st.status === "error") {
       return <Text style={[styles.itemMeta, { color: colors.warning }]}>Gagal memuat — tarik untuk coba lagi</Text>;
@@ -109,7 +115,7 @@ export default function PantauScreen() {
     if (q.snippet && q.value === 0) {
       return (
         <View style={{ marginTop: 3 }}>
-          <Text style={[styles.snippetText, { color: colors.textSecondary }]} numberOfLines={2}>
+          <Text style={[styles.snippetText, { color: colors.textSecondary }]} numberOfLines={3}>
             {q.snippet}
           </Text>
           <Text style={[styles.snippetSource, { color: colors.textTertiary }]}>
@@ -175,6 +181,8 @@ export default function PantauScreen() {
     if (exists) { Alert.alert("Sudah ada", `"${t}" sudah ada di daftar pantauan`); return; }
     addMonitor(t, newCat as any);
     setNewTitle("");
+    setShowAdd(false);
+    Keyboard.dismiss();
   }, [newTitle, newCat, monitors, addMonitor]);
 
   const handleEdit = useCallback((m: typeof monitors[0]) => {
@@ -388,27 +396,50 @@ export default function PantauScreen() {
         />
       )}
 
-      {/* Add new monitor form */}
-      <View style={[styles.bottomBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
-        <TextInput
-          style={[styles.bottomInput, { backgroundColor: colors.surfaceSecondary, color: colors.text, borderColor: colors.border }]}
-          placeholder="Nama yang mau dipantau..."
-          placeholderTextColor={colors.textTertiary}
-          value={newTitle}
-          onChangeText={setNewTitle}
-          onSubmitEditing={handleAdd}
-        />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 6 }}>
-          {MONITOR_CATEGORIES.map(c => (
-            <TouchableOpacity key={c.key} onPress={() => setNewCat(c.key)} style={[styles.catChip, { backgroundColor: newCat === c.key ? colors.primary : colors.surfaceSecondary, borderColor: colors.border }]}>
-              <Text style={{ color: newCat === c.key ? "#FFF" : colors.text, fontSize: 12 }}>{c.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-        <TouchableOpacity onPress={handleAdd} disabled={!newTitle.trim()} style={[styles.addButton, { backgroundColor: newTitle.trim() ? colors.primary : colors.border }]}>
-          <Ionicons name="add" size={20} color="#FFF" />
-        </TouchableOpacity>
-      </View>
+      {/* Add monitor modal (opened via FAB) */}
+      {showAdd && (
+        <View style={[styles.addOverlay, { backgroundColor: colors.overlay }]}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.addKav}>
+            <View style={[styles.addModal, { backgroundColor: colors.surface }]}>
+              <View style={styles.addModalHead}>
+                <Text style={[styles.addModalTitle, { color: colors.text }]}>Pantau hal baru</Text>
+                <TouchableOpacity onPress={() => { setShowAdd(false); Keyboard.dismiss(); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="close" size={22} color={colors.textTertiary} />
+                </TouchableOpacity>
+              </View>
+              <Text style={[styles.addModalHint, { color: colors.textSecondary }]}>
+                Harga, berita, stok, jadwal — apa aja. Ketik nama atau tempel link.
+              </Text>
+              <TextInput
+                style={[styles.addModalInput, { backgroundColor: colors.surfaceSecondary, color: colors.text, borderColor: colors.border }]}
+                placeholder="Contoh: Harga Beras, Berita Bola, Bitcoin..."
+                placeholderTextColor={colors.textTertiary}
+                value={newTitle}
+                onChangeText={setNewTitle}
+                autoFocus
+                onSubmitEditing={handleAdd}
+              />
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 12 }} keyboardShouldPersistTaps="handled">
+                {MONITOR_CATEGORIES.map(c => (
+                  <TouchableOpacity key={c.key} onPress={() => setNewCat(c.key)} style={[styles.catChip, { backgroundColor: newCat === c.key ? colors.primary : colors.surfaceSecondary, borderColor: colors.border }]}>
+                    <Ionicons name={c.icon} size={13} color={newCat === c.key ? "#FFF" : colors.textTertiary} style={{ marginRight: 4 }} />
+                    <Text style={{ color: newCat === c.key ? "#FFF" : colors.text, fontSize: 12 }}>{c.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <TouchableOpacity onPress={handleAdd} disabled={!newTitle.trim()} style={[styles.addModalBtn, { backgroundColor: newTitle.trim() ? colors.primary : colors.border }]}>
+                <Ionicons name="add" size={20} color="#FFF" />
+                <Text style={styles.addModalBtnText}>Tambah Pantauan</Text>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      )}
+
+      {/* FAB */}
+      <TouchableOpacity onPress={() => setShowAdd(true)} style={[styles.fab, { backgroundColor: colors.primary, shadowColor: colors.primary }]}>
+        <Ionicons name="add" size={28} color="#FFF" />
+      </TouchableOpacity>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -579,35 +610,66 @@ const styles = StyleSheet.create({
   },
   aiTitle: { fontSize: 14, fontFamily: FONT_FAMILY.semibold },
   aiBody: { fontSize: 13, lineHeight: 18, marginTop: 2, fontFamily: FONT_FAMILY.regular },
-  bottomBar: {
-    padding: SPACING.lg,
-    paddingBottom: SPACING.lg,
-    borderTopWidth: 1,
-  },
-  bottomInput: {
-    borderWidth: 1,
-    borderRadius: BORDER_RADIUS.md,
-    paddingHorizontal: 12,
-    height: 40,
-    fontSize: 14,
-    fontFamily: FONT_FAMILY.regular,
-  },
   catChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: BORDER_RADIUS.full,
     borderWidth: 1,
     marginRight: 6,
   },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  fab: {
+    position: "absolute",
+    bottom: 24,
+    right: SPACING.lg,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: "center",
     justifyContent: "center",
-    alignSelf: "flex-end",
-    marginTop: -40,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 10,
+    zIndex: 20,
   },
+  addOverlay: {
+    position: "absolute",
+    top: 0, left: 0, right: 0, bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 200,
+    paddingHorizontal: SPACING.lg,
+  },
+  addKav: { width: "100%", alignItems: "center", justifyContent: "center" },
+  addModal: {
+    width: "100%",
+    maxWidth: 380,
+    borderRadius: BORDER_RADIUS.xxl,
+    padding: SPACING.xl,
+  },
+  addModalHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  addModalTitle: { fontSize: 19, fontFamily: FONT_FAMILY.bold, letterSpacing: -0.4 },
+  addModalHint: { fontSize: 13, lineHeight: 18, marginTop: 6, fontFamily: FONT_FAMILY.regular },
+  addModalInput: {
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.lg,
+    paddingHorizontal: 14,
+    height: 50,
+    fontSize: 15,
+    marginTop: SPACING.lg,
+    fontFamily: FONT_FAMILY.regular,
+  },
+  addModalBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 15,
+    borderRadius: BORDER_RADIUS.lg,
+  },
+  addModalBtnText: { color: "#FFF", fontSize: 16, fontFamily: FONT_FAMILY.semibold },
   editOverlay: {
     position: "absolute",
     top: 0,

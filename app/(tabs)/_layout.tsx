@@ -4,21 +4,22 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useApp } from "../../src/hooks/useApp";
 import { useTheme } from "../../src/hooks";
+import { t } from "../../src/services/i18n";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
-const TABS: { name: string; label: string; icon: IconName }[] = [
-  { name: "index", label: "Beranda", icon: "home" },
-  { name: "pantau", label: "Pantau", icon: "eye" },
-  { name: "ai", label: "AI", icon: "sparkles" },
-  { name: "catatan", label: "Catatan", icon: "document-text" },
-  { name: "profil", label: "Profil", icon: "person" },
+const TABS: { name: string; labelKey: string; icon: IconName }[] = [
+  { name: "index", labelKey: "tab.home", icon: "home" },
+  { name: "pantau", labelKey: "tab.monitor", icon: "eye" },
+  { name: "ai", labelKey: "tab.ai", icon: "sparkles" },
+  { name: "catatan", labelKey: "tab.notes", icon: "document-text" },
+  { name: "profil", labelKey: "tab.profile", icon: "person" },
 ];
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
-  const { monitors } = useApp();
+  const { monitors, language } = useApp();
   const activeCount = monitors.filter(m => m.active).length;
 
   return (
@@ -56,7 +57,7 @@ export default function TabLayout() {
                     <View style={[styles.aiTabBtn, { backgroundColor: colors.primary, shadowColor: colors.primary }]}>
                       <Ionicons name="sparkles" size={22} color="#FFFFFF" />
                     </View>
-                    <Text style={[styles.tabLabel, { color: focused ? colors.primary : colors.textTertiary }]}>{tab.label}</Text>
+                    <Text style={[styles.tabLabel, { color: focused ? colors.primary : colors.textTertiary }]}>{t(tab.labelKey)}</Text>
                   </View>
                 );
               }
@@ -68,7 +69,7 @@ export default function TabLayout() {
                       <Text style={styles.badgeText}>{activeCount > 9 ? "9+" : activeCount}</Text>
                     </View>
                   )}
-                  <Text style={[styles.tabLabel, { color: focused ? colors.primary : colors.textTertiary }]}>{tab.label}</Text>
+                  <Text style={[styles.tabLabel, { color: focused ? colors.primary : colors.textTertiary }]}>{t(tab.labelKey)}</Text>
                 </View>
               );
             },
