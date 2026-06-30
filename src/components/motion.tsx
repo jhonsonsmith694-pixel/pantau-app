@@ -102,3 +102,52 @@ export function usePulse(active: boolean = true): Animated.Value {
   }, [v, active]);
   return v;
 }
+
+// --- AnimatedNumber -----------------------------------------------------------
+// Animates from 0 to a target value using Animated.timing. Formats with provided
+// formatter. Re-animates when value changes.
+interface AnimatedNumberProps {
+  value: number;
+  duration?: number;
+  format?: (n: number) => string;
+  style?: any;
+}
+export const AnimatedNumber = React.memo(function AnimatedNumber({
+  value,
+  duration = MOTION.durationSlow,
+  format = (n: number) => Math.round(n).toString(),
+  style,
+}: AnimatedNumberProps) {
+  const animatedValue = useRef(new Animated.Value(0)).current;
+  const [display, setDisplay] = React.useState(format(0));
+
+  useEffect(() => {
+    animatedValue.setValue(0);
+    const anim = Animated.timing(animatedValue, {
+      toValue: value,
+      duration,
+      easing: Easing.bezier(MOTION.easing[0], MOTION.easing[1], MOTION.easing[2], MOTION.easing[3]),
+      useNativeDriver: false, // need JS-side value for text
+    });
+
+    const listenerId = animatedValue.addListener(({ value: v }) => {
+      setDisplay(format(v));
+    });
+
+    anim.start(() => {
+      // Ensure final value is exact
+      setDisplay(format(value));
+    });
+
+    return () => {
+      anim.stop();
+      animatedValue.removeListener(listenerId);
+    };
+  }, [value, duration, format]);
+
+  return (
+    <Animated.Text style={style}>
+      {display}
+    </Animated.Text>
+  );
+});

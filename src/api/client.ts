@@ -278,6 +278,14 @@ class APIClient {
       }
     );
   }
+
+  // ===== Monitor Scrape (Firecrawl) =====
+  async monitorScrape(title: string, category: string) {
+    return this.request<{ snippet: string | null; source: string | null; url: string | null; updatedAt: string }>(
+      API_PATHS.monitorScrape,
+      { method: 'POST', headers: this.auth(), body: JSON.stringify({ title, category }), timeout: 15000 }
+    );
+  }
 }
 
 export const api = new APIClient();

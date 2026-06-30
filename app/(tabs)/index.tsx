@@ -95,13 +95,15 @@ export default function BerandaScreen() {
             { label: "Catatan", value: stats.notes, icon: "document-text" as IconName, color: colors.warning },
             { label: "Disematkan", value: stats.pinned, icon: "pin" as IconName, color: colors.error },
           ].map((s, i) => (
-            <View key={i} style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <View style={[styles.statIcon, { backgroundColor: s.color + "20" }]}>
-                <Ionicons name={s.icon} size={18} color={s.color} />
+            <FadeInView key={i} index={i}>
+              <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowColor: colors.cardShadow }]}>
+                <View style={[styles.statIcon, { backgroundColor: s.color + "20" }]}>
+                  <Ionicons name={s.icon} size={18} color={s.color} />
+                </View>
+                <Text style={[styles.statValue, { color: colors.text }]}>{s.value}</Text>
+                <Text style={[styles.statLabel, { color: colors.textTertiary }]}>{s.label}</Text>
               </View>
-              <Text style={[styles.statValue, { color: colors.text }]}>{s.value}</Text>
-              <Text style={[styles.statLabel, { color: colors.textTertiary }]}>{s.label}</Text>
-            </View>
+            </FadeInView>
           ))}
         </View>
 
@@ -131,19 +133,21 @@ export default function BerandaScreen() {
           </TouchableOpacity>
         </View>
 
-        {recentMonitors.map(m => (
-          <TouchableOpacity key={m.id} onPress={() => router.push("/pantau")} activeOpacity={0.7}>
-            <Card colors={colors} style={styles.monitorCard}>
-              <View style={[styles.mIcon, { backgroundColor: colors.accentSoft }]}>
-                <Ionicons name={categoryIcon(m.category)} size={20} color={colors.primary} />
-              </View>
-              <View style={{ flex: 1, marginLeft: SPACING.md }}>
-                <Text style={[styles.mTitle, { color: colors.text }]}>{m.title}</Text>
-                <Text style={[styles.mMeta, { color: colors.textTertiary }]}>{m.category} • {m.createdAt}</Text>
-              </View>
-              <View style={[styles.statusDot, { backgroundColor: m.active ? colors.success : colors.textTertiary }]} />
-            </Card>
-          </TouchableOpacity>
+        {recentMonitors.map((m, idx) => (
+          <FadeInView key={m.id} index={idx + 3}>
+            <TouchableOpacity onPress={() => router.push("/pantau")} activeOpacity={0.7}>
+              <Card colors={colors} style={styles.monitorCard}>
+                <View style={[styles.mIcon, { backgroundColor: colors.accentSoft }]}>
+                  <Ionicons name={categoryIcon(m.category)} size={20} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1, marginLeft: SPACING.md }}>
+                  <Text style={[styles.mTitle, { color: colors.text }]}>{m.title}</Text>
+                  <Text style={[styles.mMeta, { color: colors.textTertiary }]}>{m.category} • {m.createdAt}</Text>
+                </View>
+                <View style={[styles.statusDot, { backgroundColor: m.active ? colors.success : colors.textTertiary }]} />
+              </Card>
+            </TouchableOpacity>
+          </FadeInView>
         ))}
 
         {/* Recent Notes */}
@@ -180,7 +184,7 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 13, color: "rgba(255,255,255,0.85)", marginTop: 4, fontFamily: "Outfit_400Regular" },
   addBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   statsRow: { flexDirection: "row", gap: 8, marginTop: -16, marginBottom: SPACING.lg },
-  statCard: { flex: 1, borderRadius: BORDER_RADIUS.lg, padding: SPACING.md, alignItems: "center", borderWidth: 1, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  statCard: { flex: 1, borderRadius: BORDER_RADIUS.lg, padding: SPACING.md, alignItems: "center", borderWidth: 1, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 10, elevation: 3 },
   statIcon: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", marginBottom: 6 },
   statValue: { fontSize: 19, fontFamily: "JetBrainsMono_500Medium" },
   statLabel: { fontSize: 11, marginTop: 2, fontFamily: "Outfit_400Regular" },

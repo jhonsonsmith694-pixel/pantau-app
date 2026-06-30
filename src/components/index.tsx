@@ -1,10 +1,10 @@
 // Reusable UI Components
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Animated, Platform,
+  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Animated, Platform, Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, BORDER_RADIUS } from '../config';
+import { COLORS, SPACING, BORDER_RADIUS, MOTION } from '../config';
 import { ThemeColors } from '../services/theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -259,6 +259,40 @@ export const PullRefresh = React.memo(function PullRefresh({ refreshing, onRefre
   );
 });
 
+// --- Card Skeleton ---
+// Matches the monitor card shape: icon circle on left, two text lines, right icon area.
+// Uses pulsing opacity animation for loading state.
+interface CardSkeletonProps {
+  colors: ThemeColors;
+}
+export const CardSkeleton = React.memo(function CardSkeleton({ colors }: CardSkeletonProps) {
+  const opacity = useRef(new Animated.Value(0.4)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.4, duration: 700, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
+
+  return (
+    <Animated.View style={[styles.cardSkeleton, { backgroundColor: colors.surface, borderColor: colors.border, opacity }]}>
+      {/* Icon circle */}
+      <View style={[styles.cardSkeletonIcon, { backgroundColor: colors.border }]} />
+      {/* Text lines */}
+      <View style={{ flex: 1, marginLeft: SPACING.md }}>
+        <View style={[styles.cardSkeletonLine, { backgroundColor: colors.border, width: '60%' }]} />
+        <View style={[styles.cardSkeletonLine, { backgroundColor: colors.border, width: '40%', marginTop: SPACING.sm }]} />
+      </View>
+      {/* Right icon placeholder */}
+      <View style={[styles.cardSkeletonRightIcon, { backgroundColor: colors.border }]} />
+    </Animated.View>
+  );
+});
+
 const styles = StyleSheet.create({
   btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: BORDER_RADIUS.md },
   btnSm: { paddingVertical: 6, paddingHorizontal: 12 },
@@ -284,4 +318,8 @@ const styles = StyleSheet.create({
   dialogBtnText: { fontSize: 14, fontFamily: 'Outfit_600SemiBold' },
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: BORDER_RADIUS.full },
   badgeText: { fontSize: 11, fontFamily: 'Outfit_600SemiBold' },
+  cardSkeleton: { flexDirection: 'row', alignItems: 'center', borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg, borderWidth: 1, marginBottom: SPACING.sm },
+  cardSkeletonIcon: { width: 38, height: 38, borderRadius: BORDER_RADIUS.md },
+  cardSkeletonLine: { height: 14, borderRadius: 7 },
+  cardSkeletonRightIcon: { width: 24, height: 24, borderRadius: 12, marginLeft: SPACING.sm },
 });

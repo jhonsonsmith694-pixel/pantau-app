@@ -281,6 +281,49 @@ export default {
       const authUser = await getUserFromHeader();
       if (resource !== 'auth' && !authUser) return error('Unauthorized', 401);
 
+      // ============= MONITORS/SCRAPE (Firecrawl for non-CoinGecko items) =============
+      if (resource === 'monitors' && param1 === 'scrape' && method === 'POST') {
+        if (!(await checkRateLimit(`scrape:${authUser || ip()}`))) {
+          return json({ error: 'Terlalu banyak permintaan. Coba lagi sebentar.' }, 429);
+        }
+        if (!env.FIRECRAWL_API_KEY) return json({ snippet: null, source: null, url: null, updatedAt: now() });
+        let body;
+        try { body = await parseBody(request); } catch (e) {
+          return e instanceof BodyTooLargeError ? json({ error: e.message }, 413) : error('Invalid body', 400);
+        }
+        const title = typeof body.title === 'string' ? body.title.slice(0, 200).trim() : '';
+        const category = typeof body.category === 'string' ? body.category.slice(0, 50) : 'harga';
+        if (!title) return error('title wajib', 400);
+
+        // Build search query with Indonesia context
+        const queryHints = { harga: 'harga terbaru Indonesia 2026', berita: 'berita terbaru Indonesia', stok: 'stok ketersediaan Indonesia', jadwal: 'jadwal terbaru Indonesia' };
+        const searchQuery = `${title} ${queryHints[category] || 'Indonesia terbaru'}`;
+
+        try {
+          const fcRes = await fetch('https://api.firecrawl.dev/v2/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.FIRECRAWL_API_KEY}` },
+            body: JSON.stringify({ query: searchQuery, limit: 2 }),
+          });
+          if (!fcRes.ok) {
+            await log('scrape.error', 'monitor', null, { userId: authUser, status: fcRes.status, title });
+            return json({ snippet: null, source: null, url: null, updatedAt: now() });
+          }
+          const fc = await fcRes.json();
+          const results = (fc?.data?.web || fc?.data || []).slice(0, 2);
+          if (!results.length) return json({ snippet: null, source: null, url: null, updatedAt: now() });
+
+          const best = results[0];
+          const snippet = String(best.description || best.snippet || best.title || '').slice(0, 300);
+          const source = String(best.title || '').slice(0, 120);
+          const resultUrl = best.url || null;
+          await log('scrape.success', 'monitor', null, { userId: authUser, title, source });
+          return json({ snippet, source, url: resultUrl, updatedAt: now() });
+        } catch (e) {
+          return json({ snippet: null, source: null, url: null, updatedAt: now() });
+        }
+      }
+
       // ============= AI (NVIDIA NIM proxy — API key stays server-side) =============
       if (resource === 'ai') {
         // Rate-limit only here (per user) — protects paid AI/web credits and
@@ -302,7 +345,7 @@ export default {
             const c = it.change != null && !isNaN(Number(it.change)) ? ` (${Number(it.change).toFixed(2)}% 24j)` : '';
             return `- ${t}: ${v}${c}`;
           }).join('\n');
-          const system = 'Kamu asisten finansial pribadi untuk pengguna Indonesia. Jawab ringkas maksimal 4 kalimat, Bahasa Indonesia santai dan actionable. Hanya gunakan angka dari data yang diberikan, jangan mengarang.';
+          const system = 'Kamu asisten finansial pribadi untuk pengguna Indonesia. Format jawaban dalam bullet-point bernomor (1. 2. 3.). Setiap poin harus menyebut angka spesifik dari data yang diberikan. Bahasa Indonesia santai dan actionable. Maksimal 5 poin. Jangan mengarang angka — hanya gunakan data yang tersedia.';
           const userMsg = (question ? `Pertanyaan: ${question}\n\n` : 'Beri ringkasan dan insight dari pantauan berikut:\n') + (lines || '(belum ada data pantauan)');
           const model = env.NVIDIA_MODEL || 'meta/llama-3.1-8b-instruct';
           try {
@@ -355,11 +398,11 @@ export default {
               const fcRes = await fetch('https://api.firecrawl.dev/v2/search', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.FIRECRAWL_API_KEY}` },
-                body: JSON.stringify({ query: question, limit: 4 }),
+                body: JSON.stringify({ query: question, limit: 5 }),
               });
               if (fcRes.ok) {
                 const fc = await fcRes.json();
-                const web = (fc?.data?.web || fc?.data || []).slice(0, 4);
+                const web = (fc?.data?.web || fc?.data || []).slice(0, 5);
                 sources = web.map((r) => ({ title: String(r.title || '').slice(0, 160), url: r.url }));
                 webContext = web.map((r, i) =>
                   `[${i + 1}] ${String(r.title || '').slice(0, 160)}\n${String(r.description || r.snippet || '').slice(0, 400)}\n(${r.url})`
@@ -368,7 +411,7 @@ export default {
             } catch (e) { /* web is best-effort; fall through to price-only answer */ }
           }
 
-          const system = 'Kamu asisten pribadi untuk pengguna Indonesia. Jawab ringkas (maks 5 kalimat), Bahasa Indonesia santai dan akurat. Pakai data harga pengguna dan hasil pencarian web terkini yang diberikan. Jangan mengarang angka — kalau datanya tidak ada, katakan terus terang. Kalau memakai info dari web, sebut sumbernya secara singkat.';
+          const system = 'Kamu asisten pribadi untuk pengguna Indonesia. Aturan ketat:\n1. Selalu jawab dengan angka/data spesifik kalau tersedia.\n2. Kutip sumber inline pakai format [1], [2], dst.\n3. Kalau ada banyak poin, pakai format numbered list (1. 2. 3.).\n4. Akhiri jawaban dengan 2-3 saran pertanyaan lanjutan, masing-masing diawali 💡.\n5. Maksimal 8 kalimat, Bahasa Indonesia santai tapi data-driven.\n6. Jangan mengarang angka — kalau datanya tidak ada, katakan terus terang.\n7. Kalau memakai info dari web, sebut sumbernya secara singkat dengan nomor referensi.';
           const userMsg = [
             items.length ? `Data pantauan pengguna:\n${priceLines}` : '',
             webContext ? `Hasil pencarian web terkini:\n${webContext}` : '',
@@ -382,7 +425,7 @@ export default {
               body: JSON.stringify({
                 model,
                 messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }],
-                temperature: 0.4, max_tokens: 420, stream: false,
+                temperature: 0.35, max_tokens: 600, stream: false,
               }),
             });
             if (!aiRes.ok) {
@@ -517,6 +560,48 @@ export default {
             }
           }
           return json({ success: true, count: (body.monitors || []).length });
+        }
+
+        // POST /api/v2/monitors/scrape — Firecrawl-powered web scrape for monitor data
+        if (path.endsWith('/scrape') && method === 'POST') {
+          // Rate-limit per user (shares AI rate limit bucket)
+          if (!(await checkRateLimit(`ai:${authUser || ip()}`))) {
+            return json({ error: 'Terlalu banyak permintaan. Coba lagi sebentar lagi.' }, 429);
+          }
+          if (!env.FIRECRAWL_API_KEY) return error('Scrape belum dikonfigurasi di server', 503);
+          let body;
+          try { body = await parseBody(request); } catch (e) {
+            return e instanceof BodyTooLargeError ? json({ error: e.message }, 413) : error('Invalid body', 400);
+          }
+          const title = typeof body.title === 'string' ? body.title.slice(0, 200).trim() : '';
+          const category = typeof body.category === 'string' ? body.category.slice(0, 50).trim() : '';
+          if (!title) return error('title wajib', 400);
+          try {
+            const fcRes = await fetch('https://api.firecrawl.dev/v2/search', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.FIRECRAWL_API_KEY}` },
+              body: JSON.stringify({ query: title, limit: 2 }),
+            });
+            if (!fcRes.ok) {
+              await log('scrape.error', 'monitor', null, { userId: authUser, status: fcRes.status });
+              return json({ snippet: null, source: null });
+            }
+            const fc = await fcRes.json();
+            const results = fc?.data?.web || fc?.data || [];
+            if (!results.length) {
+              return json({ snippet: null, source: null });
+            }
+            const first = results[0];
+            return json({
+              snippet: String(first.description || first.snippet || '').slice(0, 500) || null,
+              source: String(first.title || '').slice(0, 200) || null,
+              url: first.url || null,
+              updatedAt: new Date().toISOString(),
+            });
+          } catch (e) {
+            await log('scrape.error', 'monitor', null, { userId: authUser, error: e.message });
+            return json({ snippet: null, source: null });
+          }
         }
       }
 

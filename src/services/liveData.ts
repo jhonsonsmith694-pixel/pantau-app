@@ -2,9 +2,11 @@
 // Uses free, key-free public APIs so it works directly from the device:
 //   - CoinGecko  : crypto prices + gold (via PAX Gold, 1 token ≈ 1 troy oz)
 //   - ExchangeRate (open.er-api.com) : fiat FX rates to IDR
+//   - Firecrawl (via worker) : web scraping fallback for unsupported monitors
 // Returns a real quote for recognised monitors, or null when the monitor
 // title isn't something we can fetch live (we never fake a value).
 import { logger } from './logger';
+import { api } from '../api/client';
 
 export type LiveQuote = {
   value: number;            // numeric value in IDR
@@ -12,6 +14,7 @@ export type LiveQuote = {
   change24h: number | null; // 24h percentage change, when available
   source: string;           // data source attribution
   updatedAt: string;        // ISO timestamp of when we fetched it
+  snippet?: string;         // text snippet from Firecrawl scraping
 };
 
 type FetchSpec =
@@ -21,6 +24,7 @@ type FetchSpec =
 
 const GRAMS_PER_TROY_OUNCE = 31.1035;
 const CACHE_TTL_MS = 60_000;
+const FIRECRAWL_CACHE_TTL_MS = 300_000; // 5 minutes for Firecrawl results (slower/costly)
 const REQUEST_TIMEOUT_MS = 12_000;
 
 // Hermes-safe timeout (AbortSignal.timeout is unavailable on Hermes)
@@ -145,12 +149,50 @@ async function fetchForex(base: string): Promise<{ value: number; change: number
   return { value: idr, change: null };
 }
 
+// Firecrawl fallback — calls the worker endpoint to scrape web data
+const firecrawlCache = new Map<string, { at: number; quote: LiveQuote }>();
+
+export async function fetchFirecrawlData(title: string, category: string): Promise<LiveQuote | null> {
+  const cacheKey = `firecrawl:${title}:${category}`;
+  const hit = firecrawlCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < FIRECRAWL_CACHE_TTL_MS) return hit.quote;
+
+  try {
+    const res = await api.monitorScrape(title, category);
+    if (!res.success) {
+      logger.warn(`Firecrawl gagal untuk "${title}": ${res.error}`, undefined, 'liveData');
+      return null;
+    }
+
+    const { snippet, source, url, updatedAt } = res.data;
+    if (!snippet) return null;
+
+    const quote: LiveQuote = {
+      value: 0,
+      display: '',
+      change24h: null,
+      source: source || 'Firecrawl',
+      updatedAt: updatedAt || new Date().toISOString(),
+      snippet: snippet,
+    };
+    firecrawlCache.set(cacheKey, { at: Date.now(), quote });
+    return quote;
+  } catch (e: any) {
+    logger.warn(`Firecrawl error untuk "${title}": ${e?.message || e}`, undefined, 'liveData');
+    return null;
+  }
+}
+
 const cache = new Map<string, { at: number; quote: LiveQuote }>();
 
-// Fetch a live quote for a monitor. Returns null when unsupported.
+// Fetch a live quote for a monitor. Falls back to Firecrawl when unsupported.
 export async function getLiveValue(title: string, category: string): Promise<LiveQuote | null> {
   const spec = resolveMonitor(title, category);
-  if (!spec) return null;
+
+  // If no local spec matches, try Firecrawl fallback
+  if (!spec) {
+    return fetchFirecrawlData(title, category);
+  }
 
   const cacheKey = JSON.stringify(spec);
   const hit = cache.get(cacheKey);
@@ -190,4 +232,5 @@ export async function getLiveValue(title: string, category: string): Promise<Liv
 
 export function clearLiveCache(): void {
   cache.clear();
+  firecrawlCache.clear();
 }

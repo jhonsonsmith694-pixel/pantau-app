@@ -153,6 +153,7 @@ export const API_PATHS = {
   notifications: '/api/v2/notifications',
   aiInsight: '/api/v2/ai/insight',
   aiAsk: '/api/v2/ai/ask',
+  monitorScrape: '/api/v2/monitors/scrape',
 } as const;
 
 export const ERROR_MESSAGES = {
