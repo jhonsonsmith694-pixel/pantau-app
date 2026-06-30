@@ -26,8 +26,8 @@ export default function ProfilScreen() {
 
   // Google OAuth - uses Expo proxy for simplicity (no native module needed)
   const [_request, response, promptAsync] = AuthSession.useAuthRequest({
-    androidClientId: "placeholder-android-client-id.apps.googleusercontent.com",
-    webClientId: "placeholder-web-client-id.apps.googleusercontent.com",
+    androidClientId: "584320999728-atp60cp5f1kep6on205c50tcu2bd86ru.apps.googleusercontent.com",
+    webClientId: "584320999728-atp60cp5f1kep6on205c50tcu2bd86ru.apps.googleusercontent.com",
     scopes: ["openid", "profile", "email"],
   });
 
