@@ -286,6 +286,14 @@ class APIClient {
       { method: 'POST', headers: this.auth(), body: JSON.stringify({ title, category }), timeout: 15000 }
     );
   }
+
+  // ===== Proactive AI insight (for notifications) =====
+  async aiProactive(items: { title: string; value?: string | number | null; change?: number | null }[]) {
+    return this.request<{ insight: string | null; provider?: string }>(
+      API_PATHS.aiProactive,
+      { method: 'POST', headers: this.auth(), body: JSON.stringify({ items }), timeout: 20000 }
+    );
+  }
 }
 
 export const api = new APIClient();

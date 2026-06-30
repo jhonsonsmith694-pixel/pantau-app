@@ -134,6 +134,32 @@ export const MOTION = {
   entryOffset: 16,
 };
 
+// Premium elevation system — tinted shadows (not pure black) for depth.
+// Each level pairs an iOS shadow with an Android elevation.
+export const ELEVATION = {
+  sm: {
+    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+  },
+  md: {
+    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.10, shadowRadius: 14, elevation: 5,
+  },
+  lg: {
+    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.14, shadowRadius: 28, elevation: 10,
+  },
+  glow: {
+    shadowColor: '#0F766E', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.30, shadowRadius: 20, elevation: 8,
+  },
+};
+
+// Premium multi-stop gradient meshes for hero surfaces (teal tonal family).
+export const GRADIENTS = {
+  hero: ['#0D9488', '#0F766E', '#134E4A'] as const,
+  heroDark: ['#0F766E', '#134E4A', '#0A0A0B'] as const,
+  emerald: ['#10B981', '#0D9488'] as const,
+  sunset: ['#0F766E', '#0E7490'] as const,
+  card: ['#FFFFFF', '#F7F7F8'] as const,
+};
+
 export const API_PATHS = {
   health: '/api/health',
   version: '/api/version',
@@ -153,6 +179,7 @@ export const API_PATHS = {
   notifications: '/api/v2/notifications',
   aiInsight: '/api/v2/ai/insight',
   aiAsk: '/api/v2/ai/ask',
+  aiProactive: '/api/v2/ai/proactive',
   monitorScrape: '/api/v2/monitors/scrape',
 } as const;
 

@@ -14,13 +14,27 @@ export type User = {
   updatedAt: string;
 };
 
+export type PriceAlert = {
+  enabled: boolean;
+  type: 'above' | 'below';
+  threshold: number;
+  lastTriggeredAt?: string;
+};
+
 export type Monitor = {
   id: number;
   title: string;
   category: MonitorCategory;
   active: boolean;
   createdAt: string;
+  favorite?: boolean;
+  folder?: string;
+  alert?: PriceAlert;
+  url?: string; // for website monitors
 };
+
+export type PricePoint = { t: number; v: number }; // timestamp, value
+export type PriceHistory = { monitorKey: string; points: PricePoint[] };
 
 export type Note = {
   id: number;

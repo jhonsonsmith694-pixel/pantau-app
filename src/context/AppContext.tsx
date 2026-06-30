@@ -20,6 +20,9 @@ export type AppContextType = {
   editMonitor: (id: number, updates: Partial<Monitor>) => void;
   toggleMonitor: (id: number) => void;
   deleteMonitor: (id: number) => void;
+  toggleFavorite: (id: number) => void;
+  setMonitorAlert: (id: number, alert: Monitor['alert']) => void;
+  setMonitorFolder: (id: number, folder: string) => void;
   notes: Note[];
   addNote: (title: string, content: string, category?: string, color?: string) => void;
   editNote: (id: number, title: string, content: string, category?: string, color?: string) => void;
@@ -200,6 +203,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     syncEngine.enqueue({ type: 'monitor', action: 'delete', data: { id }, priority: 'high', maxRetries: 3 });
   }, [user]);
 
+  const toggleFavorite = useCallback((id: number) => {
+    setMonitors(prev => prev.map(m => m.id === id ? { ...m, favorite: !m.favorite } : m));
+  }, []);
+
+  const setMonitorAlert = useCallback((id: number, alert: Monitor['alert']) => {
+    setMonitors(prev => prev.map(m => m.id === id ? { ...m, alert } : m));
+  }, []);
+
+  const setMonitorFolder = useCallback((id: number, folder: string) => {
+    setMonitors(prev => prev.map(m => m.id === id ? { ...m, folder } : m));
+  }, []);
+
   const addNote = useCallback((title: string, content: string, category: string = 'Umum', color = '#FFFFFF') => {
     const note: Note = { id: Date.now(), title, content, pinned: false, category: category as NoteCategory, color, createdAt: now() };
     setNotes(prev => [note, ...prev]);
@@ -228,6 +243,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({
     user, setUser, logout,
     monitors, addMonitor, editMonitor, toggleMonitor, deleteMonitor,
+    toggleFavorite, setMonitorAlert, setMonitorFolder,
     notes, addNote, editNote, deleteNote, togglePin,
     themeMode, setThemeMode, colorScheme,
     notificationEnabled, setNotificationEnabled,
@@ -236,6 +252,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }), [
     user, setUser, logout,
     monitors, addMonitor, editMonitor, toggleMonitor, deleteMonitor,
+    toggleFavorite, setMonitorAlert, setMonitorFolder,
     notes, addNote, editNote, deleteNote, togglePin,
     themeMode, setThemeMode, colorScheme,
     notificationEnabled, setNotificationEnabled,

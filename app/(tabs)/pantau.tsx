@@ -45,7 +45,7 @@ const formatIDRAnimated = (n: number): string => {
 };
 
 export default function PantauScreen() {
-  const { monitors, addMonitor, editMonitor, toggleMonitor, deleteMonitor } = useApp();
+  const { monitors, addMonitor, editMonitor, toggleMonitor, deleteMonitor, toggleFavorite } = useApp();
   const { colors, isDark } = useTheme();
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("semua");
@@ -161,6 +161,10 @@ export default function PantauScreen() {
       const matchCat = activeCategory === "semua" || m.category === activeCategory;
       const matchSearch = m.title.toLowerCase().includes(q);
       return matchCat && matchSearch;
+    }).sort((a, b) => {
+      // Favorites first, then by recency (preserve insertion order otherwise)
+      if (!!a.favorite === !!b.favorite) return 0;
+      return a.favorite ? -1 : 1;
     });
   }, [monitors, search, activeCategory]);
 
@@ -225,7 +229,12 @@ export default function PantauScreen() {
 
             {/* Content */}
             <View style={{ flex: 1, marginLeft: SPACING.md }}>
-              <Text style={[styles.itemTitle, { color: colors.text }]}>{item.title}</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Text style={[styles.itemTitle, { color: colors.text }]} numberOfLines={1}>{item.title}</Text>
+                {item.alert?.enabled && (
+                  <Ionicons name="notifications" size={13} color={colors.success} />
+                )}
+              </View>
               {isLoading ? (
                 <View style={{ marginTop: 6 }}>
                   <View style={[styles.skeletonLine, { backgroundColor: colors.border, width: '50%' }]} />
@@ -235,15 +244,20 @@ export default function PantauScreen() {
               )}
             </View>
 
+            {/* Favorite */}
+            <TouchableOpacity onPress={() => toggleFavorite(item.id)} style={{ padding: 4 }}>
+              <Ionicons name={item.favorite ? "star" : "star-outline"} size={18} color={item.favorite ? "#FBBF24" : colors.textTertiary} />
+            </TouchableOpacity>
+
             {/* Delete */}
-            <TouchableOpacity onPress={() => handleDelete(item.id, item.title)} style={{ marginLeft: SPACING.sm, padding: 4 }}>
+            <TouchableOpacity onPress={() => handleDelete(item.id, item.title)} style={{ marginLeft: 2, padding: 4 }}>
               <Ionicons name="trash-outline" size={18} color={colors.textTertiary} />
             </TouchableOpacity>
           </View>
         </PressableScale>
       </FadeInView>
     );
-  }, [colors, toggleMonitor, handleEdit, handleDelete, renderQuote, quotes]);
+  }, [colors, toggleMonitor, toggleFavorite, handleEdit, handleDelete, renderQuote, quotes]);
 
   // Skeleton loader for initial load
   const renderSkeletons = () => (
@@ -274,9 +288,16 @@ export default function PantauScreen() {
                 : 'Harga real-time crypto, emas & kurs'}
             </Text>
           </View>
-          <View style={[styles.liveIndicator, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
-            <View style={[styles.liveDot, { backgroundColor: '#34D399' }]} />
-            <Text style={styles.liveText}>LIVE</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <PressableScale onPress={() => router.push("/compare")} accessibilityLabel="Bandingkan">
+              <View style={[styles.liveIndicator, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
+                <Ionicons name="git-compare" size={14} color="#FFF" />
+              </View>
+            </PressableScale>
+            <View style={[styles.liveIndicator, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
+              <View style={[styles.liveDot, { backgroundColor: '#34D399' }]} />
+              <Text style={styles.liveText}>LIVE</Text>
+            </View>
           </View>
         </View>
       </LinearGradient>

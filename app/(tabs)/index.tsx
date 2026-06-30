@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Keyboard } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,7 +8,10 @@ import { useApp } from "../../src/hooks/useApp";
 import { useTheme, useRefresh } from "../../src/hooks";
 import { Card, EmptyState, Skeleton } from "../../src/components";
 import { FadeInView, PressableScale } from "../../src/components/motion";
-import { COLORS, SPACING, BORDER_RADIUS } from "../../src/config";
+import { COLORS, SPACING, BORDER_RADIUS, ELEVATION, GRADIENTS, FONT_FAMILY } from "../../src/config";
+import { getLiveValue, isSupported } from "../../src/services/liveData";
+import { api } from "../../src/api/client";
+import { security } from "../../src/services/security";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -21,6 +24,30 @@ export default function BerandaScreen() {
   const { colors, isDark } = useTheme();
   const router = useRouter();
   const { refreshing, onRefresh } = useRefresh(syncNow);
+  const [insight, setInsight] = useState<string | null>(null);
+
+  // Fetch a proactive AI insight from the user's monitors (best-effort).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (monitors.length === 0) return;
+      try {
+        const uid = await security.getDeviceId();
+        if (!api.getToken()) await api.register(uid, user?.name || "Pengguna", "person").catch(() => {});
+        const items = await Promise.all(
+          monitors.slice(0, 10).map(async (m) => {
+            try {
+              const q = await getLiveValue(m.title, m.category);
+              return q && q.value > 0 ? { title: m.title, value: q.display, change: q.change24h } : { title: m.title };
+            } catch { return { title: m.title }; }
+          })
+        );
+        const res = await api.aiProactive(items);
+        if (!cancelled && res.success && res.data.insight) setInsight(res.data.insight);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [monitors.length]);
 
   // Stats
   const stats = useMemo(() => ({
@@ -37,7 +64,7 @@ export default function BerandaScreen() {
   if (monitors.length === 0 && notes.length === 0) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
-        <LinearGradient colors={(colors.gradient as [string, string])} style={styles.gradientHeader}>
+        <LinearGradient colors={(isDark ? GRADIENTS.heroDark : GRADIENTS.hero) as readonly [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gradientHeader}>
           <View style={styles.headerContent}>
             <View style={{ flex: 1, paddingRight: SPACING.md }}>
               <Text style={styles.greeting}>Halo, {user?.name || "Pengguna"}</Text>
@@ -68,7 +95,7 @@ export default function BerandaScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
-      <LinearGradient colors={(colors.gradient as [string, string])} style={styles.gradientHeader}>
+      <LinearGradient colors={(isDark ? GRADIENTS.heroDark : GRADIENTS.hero) as readonly [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gradientHeader}>
         <View style={styles.headerContent}>
           <View style={{ flex: 1, paddingRight: SPACING.md }}>
             <Text style={styles.greeting}>Halo, {user?.name || "Pengguna"}</Text>
@@ -124,6 +151,16 @@ export default function BerandaScreen() {
             </View>
           </PressableScale>
         </FadeInView>
+
+        {/* AI Proactive Insight */}
+        {insight && (
+          <FadeInView index={2}>
+            <View style={[styles.insightCard, { backgroundColor: colors.accentSoft, borderColor: colors.primary + "30" }]}>
+              <Ionicons name="bulb" size={18} color={colors.primary} style={{ marginTop: 1 }} />
+              <Text style={[styles.insightText, { color: colors.text }]}>{insight}</Text>
+            </View>
+          </FadeInView>
+        )}
 
         {/* Recent Monitors */}
         <View style={styles.sectionHeader}>
@@ -191,6 +228,8 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: SPACING.md, marginTop: SPACING.sm },
   aiBanner: { flexDirection: "row", alignItems: "center", gap: SPACING.md, padding: SPACING.lg, borderRadius: BORDER_RADIUS.xl, borderWidth: 1, marginBottom: SPACING.xl },
   aiBannerIcon: { width: 44, height: 44, borderRadius: BORDER_RADIUS.lg, alignItems: "center", justifyContent: "center" },
+  insightCard: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: SPACING.md, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, marginBottom: SPACING.xl, marginTop: -SPACING.md },
+  insightText: { flex: 1, fontSize: 13, lineHeight: 19, fontFamily: FONT_FAMILY.medium },
   aiBannerTitle: { fontSize: 15, fontFamily: "Outfit_600SemiBold" },
   aiBannerDesc: { fontSize: 13, lineHeight: 18, marginTop: 2, fontFamily: "Outfit_400Regular" },
   sectionTitle: { fontSize: 16, fontFamily: "Outfit_600SemiBold" },

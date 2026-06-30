@@ -492,6 +492,34 @@ export default {
           }
         }
 
+        // /api/v2/ai/proactive — generates a short proactive insight for the
+        // user's monitors (surfaced as a notification by the app). Includes
+        // market sentiment when web data is available.
+        if (param1 === 'proactive' && method === 'POST') {
+          if (!env.GROQ_API_KEY && !env.NVIDIA_API_KEY && !env.GEMINI_API_KEY) return error('AI belum dikonfigurasi di server', 503);
+          let body;
+          try { body = await parseBody(request); } catch (e) {
+            return e instanceof BodyTooLargeError ? json({ error: e.message }, 413) : error('Invalid body', 400);
+          }
+          const items = Array.isArray(body.items) ? body.items.slice(0, 30) : [];
+          if (!items.length) return json({ insight: null });
+          const lines = items.map((it) => {
+            const t = String(it.title || '').slice(0, 100);
+            const v = it.value != null && it.value !== '' ? String(it.value).slice(0, 50) : 'manual';
+            const c = it.change != null && !isNaN(Number(it.change)) ? ` (${Number(it.change).toFixed(2)}% 24j)` : '';
+            return `- ${t}: ${v}${c}`;
+          }).join('\n');
+          const system = 'Kamu analis pasar untuk pengguna Indonesia. Dari data pantauan, pilih SATU hal paling penting/menarik (perubahan harga signifikan, peluang, atau risiko). Tulis SATU kalimat notifikasi singkat (maks 18 kata), Bahasa Indonesia, actionable, sebut angka. Tanpa basa-basi, tanpa emoji.';
+          const userMsg = `Data pantauan:\n${lines}`;
+          try {
+            const result = await callAIWithFallback(env, system, userMsg, 80, 0.5);
+            await log('ai.proactive', 'ai', null, { userId: authUser, provider: result.provider });
+            return json({ insight: result.content.trim(), provider: result.provider });
+          } catch (e) {
+            return json({ insight: null });
+          }
+        }
+
         return error('Not found', 404);
       }
 

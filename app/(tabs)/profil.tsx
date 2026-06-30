@@ -4,11 +4,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
 import * as AuthSession from "expo-auth-session/providers/google";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 import { useApp } from "../../src/hooks/useApp";
 import { useTheme } from "../../src/hooks";
 import { Card, Button, ConfirmDialog, Toast } from "../../src/components";
-import { getStorageUsage } from "../../src/storage";
+import { getStorageUsage, loadMonitors, loadNotes } from "../../src/storage";
 import { CONFIG, SPACING, BORDER_RADIUS } from "../../src/config";
+import { setLang, getLang, Lang } from "../../src/services/i18n";
 import { ThemeMode } from "../../src/types";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -23,6 +26,12 @@ export default function ProfilScreen() {
   const [toastMsg, setToastMsg] = useState("");
   const [storageInfo, setStorageInfo] = useState<{ used: number; items: Record<string, number> } | null>(null);
   const [googleUser, setGoogleUser] = useState<{ name: string; email: string } | null>(null);
+  const [lang, setLangState] = useState<Lang>(getLang());
+
+  const changeLang = useCallback((l: Lang) => {
+    setLang(l);
+    setLangState(l);
+  }, []);
 
   // Google OAuth - uses Expo proxy for simplicity (no native module needed)
   const [_request, response, promptAsync] = AuthSession.useAuthRequest({
@@ -74,13 +83,24 @@ export default function ProfilScreen() {
 
   const handleExport = useCallback(async () => {
     try {
-      const { loadMonitors, loadNotes } = await import("../../src/storage");
       const m = await loadMonitors();
       const n = await loadNotes();
-      const data = JSON.stringify({ monitors: m, notes: n, exportedAt: new Date().toISOString() }, null, 2);
-      // In a real app, use expo-file-system or share
-      Alert.alert("Export Data", `Data siap diexport (${data.length} bytes).\nFitur export file akan ditambahkan dengan expo-file-system.`);
-    } catch {}
+      // Build CSV
+      const esc = (s: any) => `"${String(s ?? '').replace(/"/g, '""')}"`;
+      let csv = 'Tipe,Judul,Kategori,Detail,Dibuat\n';
+      m.forEach(mon => { csv += `${esc('Pantauan')},${esc(mon.title)},${esc(mon.category)},${esc(mon.active ? 'aktif' : 'nonaktif')},${esc(mon.createdAt)}\n`; });
+      n.forEach(note => { csv += `${esc('Catatan')},${esc(note.title)},${esc(note.category)},${esc(note.content)},${esc(note.createdAt)}\n`; });
+
+      const fileUri = `${FileSystem.cacheDirectory}pantau-export-${Date.now()}.csv`;
+      await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: FileSystem.EncodingType.UTF8 });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, { mimeType: 'text/csv', dialogTitle: 'Export Data PANTAU' });
+      } else {
+        Alert.alert("Export", `Data tersimpan di ${fileUri}`);
+      }
+    } catch (e: any) {
+      Alert.alert("Export gagal", e?.message || "Coba lagi.");
+    }
   }, []);
 
   const handleDeleteAccount = useCallback(() => {
@@ -144,6 +164,20 @@ export default function ProfilScreen() {
               <TouchableOpacity key={opt.key} onPress={() => setThemeMode(opt.key)} style={[styles.themeOpt, { backgroundColor: themeMode === opt.key ? colors.primary : colors.surfaceSecondary, borderColor: colors.border }]}>
                 <Ionicons name={opt.icon} size={18} color={themeMode === opt.key ? "#FFF" : colors.text} />
                 <Text style={{ color: themeMode === opt.key ? "#FFF" : colors.text, fontSize: 12, fontWeight: "500" }}>{opt.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Card>
+
+        {/* Language */}
+        <View style={[styles.section, { paddingHorizontal: SPACING.lg, marginTop: SPACING.lg }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Bahasa / Language</Text>
+        </View>
+        <Card colors={colors} style={{ marginHorizontal: SPACING.lg }}>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            {([{ key: 'id' as Lang, label: '🇮🇩 Indonesia' }, { key: 'en' as Lang, label: '🇬🇧 English' }]).map(opt => (
+              <TouchableOpacity key={opt.key} onPress={() => changeLang(opt.key)} style={[styles.themeOpt, { backgroundColor: lang === opt.key ? colors.primary : colors.surfaceSecondary, borderColor: colors.border }]}>
+                <Text style={{ color: lang === opt.key ? "#FFF" : colors.text, fontSize: 13, fontWeight: "500" }}>{opt.label}</Text>
               </TouchableOpacity>
             ))}
           </View>

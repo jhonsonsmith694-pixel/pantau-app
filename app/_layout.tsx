@@ -12,8 +12,13 @@ import { JetBrainsMono_400Regular, JetBrainsMono_500Medium } from "@expo-google-
 import { AppProvider } from "../src/AppContext";
 import { useApp } from "../src/hooks/useApp";
 import { ErrorBoundary } from "../src/components/ErrorBoundary";
+import { configureNotificationHandler, requestNotificationPermission } from "../src/services/notifications";
+import { registerBackgroundFetch } from "../src/services/background";
 
 SplashScreen.preventAutoHideAsync();
+
+// Configure notification display behavior once at module load.
+configureNotificationHandler();
 
 // Global baseline font so every Text without an explicit family uses Outfit
 // (taste skills ban system defaults). Headers/labels override with their own weight.
@@ -45,6 +50,10 @@ function RootNavigator() {
         SplashScreen.hideAsync();
         setSplashDone(true);
       }, 200);
+      // Set up notifications + background price-alert checks (best-effort).
+      requestNotificationPermission().then(granted => {
+        if (granted) registerBackgroundFetch();
+      });
     }
   }, [loaded, fontsLoaded]);
 
@@ -74,6 +83,7 @@ function RootNavigator() {
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="monitor/[id]" options={{ animation: "slide_from_right" }} />
+        <Stack.Screen name="compare" options={{ animation: "slide_from_bottom" }} />
       </Stack>
     </>
   );
