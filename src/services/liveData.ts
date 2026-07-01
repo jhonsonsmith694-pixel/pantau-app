@@ -15,6 +15,8 @@ export type LiveQuote = {
   source: string;           // data source attribution
   updatedAt: string;        // ISO timestamp of when we fetched it
   snippet?: string;         // text snippet from Firecrawl scraping
+  sourceUrl?: string;       // primary source URL (for "baca lengkap")
+  sources?: { title: string; url: string }[]; // all sources for verification
 };
 
 type FetchSpec =
@@ -165,6 +167,7 @@ export async function fetchFirecrawlData(title: string, category: string): Promi
     }
 
     const { snippet, source, url, updatedAt } = res.data;
+    const sources = (res.data as any).sources || [];
     if (!snippet) return null;
 
     const quote: LiveQuote = {
@@ -174,6 +177,8 @@ export async function fetchFirecrawlData(title: string, category: string): Promi
       source: source || 'Firecrawl',
       updatedAt: updatedAt || new Date().toISOString(),
       snippet: snippet,
+      sourceUrl: url || undefined,
+      sources: sources,
     };
     firecrawlCache.set(cacheKey, { at: Date.now(), quote });
     return quote;

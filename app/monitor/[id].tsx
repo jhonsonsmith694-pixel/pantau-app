@@ -43,6 +43,8 @@ export default function MonitorDetailScreen() {
   const [showAlert, setShowAlert] = useState(false);
   const [alertType, setAlertType] = useState<'above' | 'below'>('above');
   const [alertValue, setAlertValue] = useState("");
+  const [fullContent, setFullContent] = useState<string | null>(null);
+  const [fullLoading, setFullLoading] = useState(false);
 
   const monitor = monitors.find(m => String(m.id) === id);
   const screenW = Dimensions.get('window').width;
@@ -89,6 +91,23 @@ export default function MonitorDetailScreen() {
       setAiLoading(false);
     }
   }, [monitor, quote, user, aiLoading]);
+
+  const readFull = useCallback(async () => {
+    const url = quote?.sourceUrl || quote?.sources?.[0]?.url;
+    if (!url || fullLoading) return;
+    setFullLoading(true);
+    try {
+      const uid = await security.getDeviceId();
+      if (!api.getToken()) await api.register(uid, user?.name || "Pengguna", "person").catch(() => {});
+      const res = await api.firecrawlScrape(url);
+      if (res.success && res.data.content) setFullContent(res.data.content);
+      else setFullContent("Gagal memuat isi lengkap. Buka sumber di browser.");
+    } catch {
+      setFullContent("Koneksi bermasalah. Coba lagi.");
+    } finally {
+      setFullLoading(false);
+    }
+  }, [quote, user, fullLoading]);
 
   const toggleSpeak = useCallback(() => {
     if (!aiAnswer) return;
@@ -202,6 +221,41 @@ export default function MonitorDetailScreen() {
             )}
           </View>
         </FadeInView>
+
+        {/* Full news + verification sources (Firecrawl) */}
+        {quote?.snippet && (quote.sourceUrl || (quote.sources && quote.sources.length > 0)) && (
+          <FadeInView index={1}>
+            <View style={[styles.newsCard, { backgroundColor: colors.surface, borderColor: colors.border }, ELEVATION.sm]}>
+              {!fullContent ? (
+                <PressableScale onPress={readFull} disabled={fullLoading} accessibilityLabel="Baca berita lengkap">
+                  <View style={styles.readFullBtn}>
+                    <Ionicons name={fullLoading ? "hourglass-outline" : "book-outline"} size={18} color={colors.primary} />
+                    <Text style={[styles.readFullText, { color: colors.primary }]}>
+                      {fullLoading ? "Memuat isi lengkap..." : "Baca berita lengkap"}
+                    </Text>
+                  </View>
+                </PressableScale>
+              ) : (
+                <Text style={[styles.fullContent, { color: colors.text }]}>{fullContent}</Text>
+              )}
+
+              {/* Verification sources */}
+              {quote.sources && quote.sources.length > 0 && (
+                <View style={styles.verifyBox}>
+                  <Text style={[styles.verifyLabel, { color: colors.textTertiary }]}>CEK KEBENARAN — {quote.sources.length} SUMBER</Text>
+                  {quote.sources.slice(0, 5).map((s, i) => (
+                    <PressableScale key={i} onPress={() => s.url && Linking.openURL(s.url)}>
+                      <View style={styles.verifyRow}>
+                        <Ionicons name="open-outline" size={13} color={colors.primary} />
+                        <Text style={[styles.verifyText, { color: colors.primary }]} numberOfLines={1}>{s.title || s.url}</Text>
+                      </View>
+                    </PressableScale>
+                  ))}
+                </View>
+              )}
+            </View>
+          </FadeInView>
+        )}
 
         {/* Price Alert */}
         <FadeInView index={1}>
@@ -326,6 +380,14 @@ const styles = StyleSheet.create({
   sourceText: { fontSize: 11, fontFamily: FONT_FAMILY.regular, marginTop: 8 },
   snippetBox: { padding: SPACING.md, borderRadius: BORDER_RADIUS.lg, marginTop: SPACING.sm },
   snippetContent: { fontSize: 13, lineHeight: 19, fontFamily: FONT_FAMILY.regular },
+  newsCard: { borderRadius: BORDER_RADIUS.xl, borderWidth: 1, padding: SPACING.lg, marginBottom: SPACING.lg },
+  readFullBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 6 },
+  readFullText: { fontSize: 15, fontFamily: FONT_FAMILY.semibold },
+  fullContent: { fontSize: 14, lineHeight: 22, fontFamily: FONT_FAMILY.regular },
+  verifyBox: { marginTop: SPACING.md, paddingTop: SPACING.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(127,127,127,0.2)" },
+  verifyLabel: { fontSize: 9, fontFamily: FONT_FAMILY.semibold, letterSpacing: 1, marginBottom: 6 },
+  verifyRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 4 },
+  verifyText: { fontSize: 12, flex: 1, fontFamily: FONT_FAMILY.medium },
   noDataText: { fontSize: 14, fontFamily: FONT_FAMILY.medium, marginTop: 8 },
   row: { flexDirection: "row", alignItems: "center", gap: SPACING.md, padding: SPACING.md, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, marginBottom: SPACING.sm },
   rowIcon: { width: 38, height: 38, borderRadius: BORDER_RADIUS.md, alignItems: "center", justifyContent: "center" },

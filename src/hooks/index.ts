@@ -10,6 +10,14 @@ import { useApp } from './useApp';
 
 export { useApp } from './useApp';
 
+// ===== useI18n — translation bound to the active language (re-renders on change) =====
+import { t as translate } from '../services/i18n';
+export function useI18n() {
+  const { language } = useApp();
+  // language dependency ensures consumers re-render when it changes
+  return { t: (key: string) => translate(key), language };
+}
+
 // ===== useTheme =====
 export function useTheme() {
   const { themeMode, colorScheme } = useApp();

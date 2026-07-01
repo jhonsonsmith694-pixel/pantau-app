@@ -4,7 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useApp } from "../../src/hooks/useApp";
-import { useTheme, useDebounce } from "../../src/hooks";
+import { useTheme, useDebounce, useI18n } from "../../src/hooks";
 import { Card, EmptyState, Badge, Button, Toast } from "../../src/components";
 import { NOTE_CATEGORIES, NOTE_COLORS } from "../../src/types";
 import { SPACING, BORDER_RADIUS, FONTS } from "../../src/config";
@@ -12,6 +12,7 @@ import { SPACING, BORDER_RADIUS, FONTS } from "../../src/config";
 export default function CatatanScreen() {
   const { notes, addNote, editNote, deleteNote, togglePin } = useApp();
   const { colors } = useTheme();
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("Semua");
   const [showForm, setShowForm] = useState(false);
@@ -139,7 +140,7 @@ export default function CatatanScreen() {
       {/* Search */}
       <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Ionicons name="search" size={18} color={colors.textTertiary} />
-        <TextInput style={[styles.searchInput, { color: colors.text }]} placeholder="Cari catatan..." placeholderTextColor={colors.textTertiary} value={search} onChangeText={setSearch} />
+        <TextInput style={[styles.searchInput, { color: colors.text }]} placeholder={t("notes.search")} placeholderTextColor={colors.textTertiary} value={search} onChangeText={setSearch} />
       </View>
 
       {/* Category Filter */}
@@ -230,7 +231,7 @@ export default function CatatanScreen() {
           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.kav}>
             <View style={[styles.modal, { backgroundColor: colors.surface }]}>
               <View style={styles.modalHead}>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>Catatan baru</Text>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>{t("notes.newTitle")}</Text>
                 <TouchableOpacity onPress={() => { setShowForm(false); Keyboard.dismiss(); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Ionicons name="close" size={22} color={colors.textTertiary} />
                 </TouchableOpacity>

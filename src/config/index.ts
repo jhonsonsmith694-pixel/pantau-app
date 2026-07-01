@@ -181,6 +181,8 @@ export const API_PATHS = {
   aiAsk: '/api/v2/ai/ask',
   aiProactive: '/api/v2/ai/proactive',
   monitorScrape: '/api/v2/monitors/scrape',
+  firecrawlScrape: '/api/v2/firecrawl/scrape',
+  firecrawlExtract: '/api/v2/firecrawl/extract',
 } as const;
 
 export const ERROR_MESSAGES = {

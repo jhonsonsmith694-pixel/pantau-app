@@ -11,6 +11,9 @@ import { userRepo, monitorRepo, noteRepo, settingsRepo, syncRepo } from '../repo
 import { api } from '../api/client';
 import { security } from '../services/security';
 import { setLang } from '../services/i18n';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const LANG_KEY = '@pantau_language';
 
 export type AppContextType = {
   user: { name: string; avatar: string } | null;
@@ -79,6 +82,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         await migrateStorage();
+        // Restore language preference early so first paint is correct.
+        try {
+          const savedLang = await AsyncStorage.getItem(LANG_KEY);
+          if (savedLang === 'id' || savedLang === 'en') { setLang(savedLang); setLanguageState(savedLang); }
+        } catch {}
         // Establish a stable device identity + restore any saved session token
         // BEFORE touching the network, so cloud features survive app restarts.
         try {
@@ -243,7 +251,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const setThemeMode = useCallback((m: ThemeMode) => setThemeModeState(m), []);
   const setNotificationEnabled = useCallback((v: boolean) => setNotificationState(v), []);
-  const setLanguage = useCallback((l: 'id' | 'en') => { setLang(l); setLanguageState(l); }, []);
+  const setLanguage = useCallback((l: 'id' | 'en') => { setLang(l); setLanguageState(l); AsyncStorage.setItem(LANG_KEY, l).catch(() => {}); }, []);
 
   const value = useMemo(() => ({
     user, setUser, logout,

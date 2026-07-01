@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useApp } from "../../src/hooks/useApp";
-import { useTheme, useRefresh } from "../../src/hooks";
+import { useTheme, useRefresh, useI18n } from "../../src/hooks";
 import { Card, EmptyState, Skeleton } from "../../src/components";
 import { FadeInView, PressableScale } from "../../src/components/motion";
 import { COLORS, SPACING, BORDER_RADIUS, ELEVATION, GRADIENTS, FONT_FAMILY } from "../../src/config";
@@ -22,6 +22,7 @@ const CATEGORY_ICONS: Record<string, IconName> = {
 export default function BerandaScreen() {
   const { user, monitors, notes, syncNow, syncing } = useApp();
   const { colors, isDark } = useTheme();
+  const { t } = useI18n();
   const router = useRouter();
   const { refreshing, onRefresh } = useRefresh(syncNow);
   const [insight, setInsight] = useState<string | null>(null);
@@ -142,7 +143,7 @@ export default function BerandaScreen() {
                 <Ionicons name="sparkles" size={20} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.aiBannerTitle, { color: colors.text }]}>Asisten AI</Text>
+                <Text style={[styles.aiBannerTitle, { color: colors.text }]}>{t("home.aiTitle")}</Text>
                 <Text style={[styles.aiBannerDesc, { color: colors.textSecondary }]} numberOfLines={2}>
                   Tanya apa saja soal pantauan kamu — dijawab pakai data harga real.
                 </Text>
@@ -164,7 +165,7 @@ export default function BerandaScreen() {
 
         {/* Recent Monitors */}
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Pantauan Terbaru</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("home.recentMonitors")}</Text>
           <TouchableOpacity onPress={() => router.push("/pantau")}>
             <Text style={[styles.sectionLink, { color: colors.primary }]}>Lihat Semua</Text>
           </TouchableOpacity>

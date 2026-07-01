@@ -4,7 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useApp } from "../../src/hooks/useApp";
-import { useTheme } from "../../src/hooks";
+import { useTheme, useI18n } from "../../src/hooks";
 import { Card, EmptyState, Badge, CardSkeleton } from "../../src/components";
 import { MONITOR_CATEGORIES, PREDEFINED_MONITORS } from "../../src/types";
 import { SPACING, BORDER_RADIUS, FONTS, TABULAR, MOTION, FONT_FAMILY } from "../../src/config";
@@ -47,6 +47,7 @@ const formatIDRAnimated = (n: number): string => {
 export default function PantauScreen() {
   const { monitors, addMonitor, editMonitor, toggleMonitor, deleteMonitor, toggleFavorite } = useApp();
   const { colors, isDark } = useTheme();
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("semua");
   const [newTitle, setNewTitle] = useState("");
@@ -289,7 +290,7 @@ export default function PantauScreen() {
       <LinearGradient colors={colors.gradient as [string, string]} style={styles.gradientHeader}>
         <View style={styles.headerContent}>
           <View style={{ flex: 1, paddingRight: SPACING.md }}>
-            <Text style={styles.headerTitle}>Pantau</Text>
+            <Text style={styles.headerTitle}>{t("monitor.title")}</Text>
             <Text style={styles.headerSub}>
               {liveCount > 0
                 ? `${liveCount} harga real-time · tarik untuk refresh`
@@ -315,7 +316,7 @@ export default function PantauScreen() {
         <Ionicons name="search" size={18} color={colors.textTertiary} />
         <TextInput
           style={[styles.searchInput, { color: colors.text }]}
-          placeholder="Cari pantauan..."
+          placeholder={t("monitor.search")}
           placeholderTextColor={colors.textTertiary}
           value={search}
           onChangeText={setSearch}
@@ -402,7 +403,7 @@ export default function PantauScreen() {
           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.addKav}>
             <View style={[styles.addModal, { backgroundColor: colors.surface }]}>
               <View style={styles.addModalHead}>
-                <Text style={[styles.addModalTitle, { color: colors.text }]}>Pantau hal baru</Text>
+                <Text style={[styles.addModalTitle, { color: colors.text }]}>{t("monitor.addTitle")}</Text>
                 <TouchableOpacity onPress={() => { setShowAdd(false); Keyboard.dismiss(); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Ionicons name="close" size={22} color={colors.textTertiary} />
                 </TouchableOpacity>
@@ -412,7 +413,7 @@ export default function PantauScreen() {
               </Text>
               <TextInput
                 style={[styles.addModalInput, { backgroundColor: colors.surfaceSecondary, color: colors.text, borderColor: colors.border }]}
-                placeholder="Contoh: Harga Beras, Berita Bola, Bitcoin..."
+                placeholder={t("monitor.addPlaceholder")}
                 placeholderTextColor={colors.textTertiary}
                 value={newTitle}
                 onChangeText={setNewTitle}
@@ -429,7 +430,7 @@ export default function PantauScreen() {
               </ScrollView>
               <TouchableOpacity onPress={handleAdd} disabled={!newTitle.trim()} style={[styles.addModalBtn, { backgroundColor: newTitle.trim() ? colors.primary : colors.border }]}>
                 <Ionicons name="add" size={20} color="#FFF" />
-                <Text style={styles.addModalBtnText}>Tambah Pantauan</Text>
+                <Text style={styles.addModalBtnText}>{t("monitor.addBtn")}</Text>
               </TouchableOpacity>
             </View>
           </KeyboardAvoidingView>

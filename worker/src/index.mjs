@@ -374,38 +374,123 @@ export default {
         const category = typeof body.category === 'string' ? body.category.slice(0, 50) : 'harga';
         if (!title) return error('title wajib', 400);
 
-        // Build search query with Indonesia context
-        const queryHints = { harga: 'harga terbaru Indonesia 2026', berita: 'berita terbaru Indonesia', stok: 'stok ketersediaan Indonesia', jadwal: 'jadwal terbaru Indonesia' };
-        const searchQuery = `${title} ${queryHints[category] || 'Indonesia terbaru'}`;
+        // Smart query building — detect topic for better Indonesian results.
+        const tl = title.toLowerCase();
+        let hint;
+        if (/(sembako|beras|minyak goreng|gula|telur|cabai|bawang|daging|tepung|harga pangan)/.test(tl)) {
+          hint = 'harga terbaru hari ini pasar Indonesia per kg';
+        } else if (/(bansos|blt|pkh|bantuan sosial|subsidi|kartu prakerja|kartu sembako|pip|kip)/.test(tl)) {
+          hint = 'bantuan sosial pemerintah Indonesia terbaru cara cek penerima resmi';
+        } else if (/(bbm|pertalite|pertamax|solar|bensin|gas elpiji|lpg)/.test(tl)) {
+          hint = 'harga resmi terbaru Indonesia hari ini';
+        } else if (/(lowongan|loker|cpns|pppk|kerja)/.test(tl)) {
+          hint = 'lowongan kerja terbaru Indonesia resmi';
+        } else {
+          const byCat = { harga: 'harga terbaru Indonesia hari ini', berita: 'berita terbaru Indonesia hari ini', stok: 'stok ketersediaan Indonesia', jadwal: 'jadwal terbaru Indonesia' };
+          hint = byCat[category] || 'Indonesia terbaru hari ini';
+        }
+        const searchQuery = `${title} ${hint}`;
 
         try {
           const fcRes = await fetch('https://api.firecrawl.dev/v2/search', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.FIRECRAWL_API_KEY}` },
-            body: JSON.stringify({ query: searchQuery, limit: 2 }),
+            body: JSON.stringify({ query: searchQuery, limit: 5 }),
           });
           if (!fcRes.ok) {
             await log('scrape.error', 'monitor', null, { userId: authUser, status: fcRes.status, title });
-            return json({ snippet: null, source: null, url: null, updatedAt: now() });
+            return json({ snippet: null, source: null, url: null, sources: [], updatedAt: now() });
           }
           const fc = await fcRes.json();
-          const results = (fc?.data?.web || fc?.data || []).slice(0, 3);
-          if (!results.length) return json({ snippet: null, source: null, url: null, updatedAt: now() });
+          const results = (fc?.data?.web || fc?.data || []).slice(0, 5);
+          if (!results.length) return json({ snippet: null, source: null, url: null, sources: [], updatedAt: now() });
 
           // Combine the top results into a fuller, more useful snippet.
           const best = results[0];
           const parts = results
             .map(r => String(r.description || r.snippet || '').trim())
             .filter(Boolean);
-          let snippet = parts.join(' ').slice(0, 480);
+          let snippet = parts.join(' ').slice(0, 600);
           if (!snippet) snippet = String(best.title || '').slice(0, 200);
           const source = String(best.title || '').slice(0, 120);
           const resultUrl = best.url || null;
+          // Return all sources so users can verify accuracy.
+          const sources = results.map(r => ({ title: String(r.title || '').slice(0, 160), url: r.url })).filter(s => s.url);
           await log('scrape.success', 'monitor', null, { userId: authUser, title, source });
-          return json({ snippet, source, url: resultUrl, updatedAt: now() });
+          return json({ snippet, source, url: resultUrl, sources, updatedAt: now() });
         } catch (e) {
-          return json({ snippet: null, source: null, url: null, updatedAt: now() });
+          return json({ snippet: null, source: null, url: null, sources: [], updatedAt: now() });
         }
+      }
+
+      // ============= FIRECRAWL — full feature integration =============
+      // /api/v2/firecrawl/scrape { url } → full page content as markdown (for
+      // "Baca berita lengkap"). /api/v2/firecrawl/extract { title, prompt } →
+      // structured data pulled from live web (for accurate sembako/bansos).
+      if (resource === 'firecrawl') {
+        if (!(await checkRateLimit(`fc:${authUser || ip()}`))) {
+          return json({ error: 'Terlalu banyak permintaan. Coba lagi sebentar.' }, 429);
+        }
+        if (!env.FIRECRAWL_API_KEY) return error('Firecrawl belum dikonfigurasi', 503);
+        let body;
+        try { body = await parseBody(request); } catch (e) {
+          return e instanceof BodyTooLargeError ? json({ error: e.message }, 413) : error('Invalid body', 400);
+        }
+
+        // Full article scrape → markdown
+        if (param1 === 'scrape' && method === 'POST') {
+          const targetUrl = typeof body.url === 'string' ? body.url.slice(0, 500).trim() : '';
+          if (!/^https?:\/\//.test(targetUrl)) return error('url tidak valid', 400);
+          try {
+            const r = await fetch('https://api.firecrawl.dev/v2/scrape', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.FIRECRAWL_API_KEY}` },
+              body: JSON.stringify({ url: targetUrl, formats: ['markdown'], onlyMainContent: true }),
+            });
+            if (!r.ok) return json({ content: null });
+            const d = await r.json();
+            const md = d?.data?.markdown || d?.markdown || '';
+            const title = d?.data?.metadata?.title || d?.metadata?.title || '';
+            await log('fc.scrape', 'firecrawl', null, { userId: authUser });
+            return json({ content: String(md).slice(0, 8000), title: String(title).slice(0, 200), url: targetUrl });
+          } catch (e) {
+            return json({ content: null });
+          }
+        }
+
+        // Structured extract → pulls concrete data (e.g. current prices) from web
+        if (param1 === 'extract' && method === 'POST') {
+          const query = typeof body.query === 'string' ? body.query.slice(0, 300).trim() : '';
+          const prompt = typeof body.prompt === 'string' ? body.prompt.slice(0, 400) : 'Ambil data harga/angka terbaru beserta tanggal dan sumbernya.';
+          if (!query) return error('query wajib', 400);
+          try {
+            // First find relevant URLs via search, then extract structured data.
+            const sr = await fetch('https://api.firecrawl.dev/v2/search', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.FIRECRAWL_API_KEY}` },
+              body: JSON.stringify({ query: `${query} harga data resmi Indonesia terbaru`, limit: 3 }),
+            });
+            const urls = [];
+            if (sr.ok) {
+              const sd = await sr.json();
+              (sd?.data?.web || sd?.data || []).slice(0, 3).forEach(r => r.url && urls.push(r.url));
+            }
+            if (!urls.length) return json({ data: null, sources: [] });
+            const ex = await fetch('https://api.firecrawl.dev/v2/extract', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.FIRECRAWL_API_KEY}` },
+              body: JSON.stringify({ urls, prompt }),
+            });
+            if (!ex.ok) return json({ data: null, sources: urls });
+            const ed = await ex.json();
+            await log('fc.extract', 'firecrawl', null, { userId: authUser });
+            return json({ data: ed?.data || null, sources: urls });
+          } catch (e) {
+            return json({ data: null, sources: [] });
+          }
+        }
+
+        return error('Not found', 404);
       }
 
       // ============= AI (NVIDIA NIM proxy — API key stays server-side) =============

@@ -6,7 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useApp } from "../../src/hooks/useApp";
-import { useTheme } from "../../src/hooks";
+import { useTheme, useI18n } from "../../src/hooks";
 import { SPACING, BORDER_RADIUS, FONTS, TABULAR, FONT_FAMILY } from "../../src/config";
 import { FadeInView, PressableScale, usePulse } from "../../src/components/motion";
 import { getLiveValue, isSupported } from "../../src/services/liveData";
@@ -55,6 +55,7 @@ function cleanResponse(text: string): string {
 export default function AiScreen() {
   const { user, monitors } = useApp();
   const { colors } = useTheme();
+  const { t } = useI18n();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -162,13 +163,13 @@ export default function AiScreen() {
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <View style={{ flex: 1 }}>
           <Text style={[FONTS.eyebrow, { color: colors.primary }]}>PANTAU AI</Text>
-          <Text style={[styles.title, { color: colors.text }]}>Asisten kamu</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{t("ai.title")}</Text>
         </View>
         {messages.length > 0 && (
           <PressableScale onPress={clearHistory} accessibilityLabel="Hapus riwayat">
             <View style={[styles.clearBtn, { backgroundColor: colors.surfaceSecondary }]}>
               <Ionicons name="trash-outline" size={16} color={colors.textTertiary} />
-              <Text style={[styles.clearBtnText, { color: colors.textTertiary }]}>Hapus</Text>
+              <Text style={[styles.clearBtnText, { color: colors.textTertiary }]}>{t("ai.clear")}</Text>
             </View>
           </PressableScale>
         )}
@@ -192,7 +193,7 @@ export default function AiScreen() {
                 <View style={[styles.introIcon, { backgroundColor: colors.accentSoft }]}>
                   <Ionicons name="sparkles" size={22} color={colors.primary} />
                 </View>
-                <Text style={[styles.introTitle, { color: colors.text }]}>Mulai ngobrol</Text>
+                <Text style={[styles.introTitle, { color: colors.text }]}>{t("ai.startTitle")}</Text>
                 <Text style={[styles.introDesc, { color: colors.textSecondary }]}>
                   Tanya apa saja - harga, berita, analisis. Dijawab pakai data real-time + web search. Riwayat chat tersimpan otomatis.
                 </Text>
@@ -288,7 +289,7 @@ export default function AiScreen() {
         <View style={[styles.composer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
           <TextInput
             style={[styles.input, { color: colors.text, backgroundColor: colors.surfaceSecondary }]}
-            placeholder="Tanya apa saja..."
+            placeholder={t("ai.placeholder")}
             placeholderTextColor={colors.textTertiary}
             value={input}
             onChangeText={setInput}

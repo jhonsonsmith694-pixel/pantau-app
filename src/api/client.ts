@@ -281,9 +281,25 @@ class APIClient {
 
   // ===== Monitor Scrape (Firecrawl) =====
   async monitorScrape(title: string, category: string) {
-    return this.request<{ snippet: string | null; source: string | null; url: string | null; updatedAt: string }>(
+    return this.request<{ snippet: string | null; source: string | null; url: string | null; sources?: { title: string; url: string }[]; updatedAt: string }>(
       API_PATHS.monitorScrape,
       { method: 'POST', headers: this.auth(), body: JSON.stringify({ title, category }), timeout: 15000 }
+    );
+  }
+
+  // ===== Firecrawl full-content scrape (for "Baca berita lengkap") =====
+  async firecrawlScrape(url: string) {
+    return this.request<{ content: string | null; title?: string; url?: string }>(
+      API_PATHS.firecrawlScrape,
+      { method: 'POST', headers: this.auth(), body: JSON.stringify({ url }), timeout: 30000 }
+    );
+  }
+
+  // ===== Firecrawl structured extract (accurate prices/data) =====
+  async firecrawlExtract(query: string, prompt?: string) {
+    return this.request<{ data: any; sources: string[] }>(
+      API_PATHS.firecrawlExtract,
+      { method: 'POST', headers: this.auth(), body: JSON.stringify({ query, prompt }), timeout: 40000 }
     );
   }
 
